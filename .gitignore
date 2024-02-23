@@ -1,0 +1,9 @@
+*.obj
+*.exe
+*.pdb
+*.ini
+*.rdbg
+*.cap
+*.lib
+*.bak
+*.exp
