@@ -101,14 +101,16 @@ render_all_entities :: () {
 }
 
 save_level :: (level_name: string) {
-    entity_list := context.entity_list;
+    entity_list := *context.entity_list;
     make_directory_if_it_does_not_exist(tprint("levels/%", level_name));
     
-    files := file_list(tprint("levels/%", level_name));
+    path := level_name;
+    if equal(level_name, "") path = "_temp";
+    files := file_list(tprint("levels/%", path));
     for files file_delete(it);
     
     for entity_list.active_entities {
-        file_name := tprint("levels/%/%_%.entity", level_name, it.id, it.class);
+        file_name := tprint("levels/%/%_%.entity", path, it.id, it.class);
         string_to_write := save_entity(file_name, it);
         write_entire_file(file_name, string_to_write);
     }
@@ -117,10 +119,12 @@ save_level :: (level_name: string) {
 load_level :: (level_name: string) {
     remove_all_entities();
     
-    files := file_list(tprint("levels/%", level_name));
+    path := level_name;
+    if equal(level_name, "") path = "_temp";
+    files := file_list(tprint("levels/%", path));
     for files {
         id, class: int;
-        success0 := scan2(it, tprint("levels/%/%%_%%.entity", level_name), *id, *class);
+        success0 := scan2(it, tprint("levels/%/%%_%%.entity", path), *id, *class);
         if !success0 continue;
         
         e := create_entity_from_save(cast(Entity_Class) class, id);
@@ -143,6 +147,17 @@ load_level :: (level_name: string) {
         
         load_entity(e, version, *members);
     }
+}
+
+find_entities_by_class :: (class: Entity_Class) -> [..] *Entity {
+    out: [..] *Entity;
+    
+    entity_list := *context.entity_list;
+    for entity_list.active_entities {
+        if it.class == class array_add(*out, it);
+    }
+    
+    return out;
 }
 
 ENTITY_BUCKET_SIZE :: 256;

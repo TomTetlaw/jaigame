@@ -48,10 +48,10 @@ prepare_basic_shader :: (position: Vec2, size: Vec2, colour: Vec4, texture: u32)
     glUseProgram(program);
     
     position_size_loc := glGetUniformLocation(program, "position_size");
-    final_position := position - camera_position;
+    final_position := position - camera_position + render_half_size;
     glUniform4f(position_size_loc, final_position.x, final_position.y, size.x, size.y);
     
-    projection: Matrix4 = orthographic_projection_matrix(0, 1366, 0, 768, -1, 1);
+    projection: Matrix4 = orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     projection_loc := glGetUniformLocation(program, "projection_matrix");
     glUniformMatrix4fv(projection_loc, 1, GL_TRUE, cast (*float) *projection);
     
@@ -113,11 +113,11 @@ prepare_coloured_shader :: (position: Vec2, size: Vec2, colour: Vec4) {
     
     glUseProgram(program);
 
-    final_position := position - camera_position;
+    final_position := position - camera_position + render_half_size;
     position_size_loc := glGetUniformLocation(program, "position_size");
     glUniform4f(position_size_loc, final_position.x, final_position.y, size.x, size.y);
     
-    projection: Matrix4 = orthographic_projection_matrix(0, 1366, 0, 768, -1, 1);
+    projection: Matrix4 = orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     projection_loc := glGetUniformLocation(program, "projection_matrix");
     glUniformMatrix4fv(projection_loc, 1, GL_TRUE, cast (*float) *projection);
     

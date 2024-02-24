@@ -1,6 +1,7 @@
 
 editor_open: bool;
 editor_unsaved_changes: bool;
+current_level_name: string;
 
 editor_init :: () {
     x_axis.texture = _texture_x_axis;
@@ -161,7 +162,8 @@ editor_do_imgui :: () {
 editor_update :: () {
     x, y: s32;
     SDL_GetMouseState(*x, *y);
-    mouse_position = v2(xx x, xx (768-y));
+    mouse_position = v2(xx x, xx (render_size.y-y)) + camera_position;
+    mouse_position -= render_half_size;
     
     if selected_entities.count > 0 {
         entity := selected_entities[0];
@@ -174,6 +176,13 @@ editor_handle_keyboard_event :: (event: *SDL_Event) {
     if event.key.keysym.scancode == SDL_SCANCODE_DELETE {
         for selected_entities remove_entity(it);
         selected_entities.count = 0;
+    } else if event.key.keysym.scancode == SDL_SCANCODE_F5 {
+        editor_save_level();
+        start_game();
+    } else if event.key.keysym.scancode == SDL_SCANCODE_F {
+        if selected_entities.count == 1 {
+            set_camera_position(selected_entities[0].position);
+        }
     }
 }
 
@@ -190,7 +199,7 @@ editor_handle_mouse_event :: (event: *SDL_Event) {
         
         if moving_camera {
             motion := Vec2.{ xx event.motion.xrel, xx -event.motion.yrel };
-            camera_position -= motion;
+            set_camera_position(camera_position - motion);
         }
     }
     
@@ -289,10 +298,10 @@ do_custom_imgui :: (name: string, value: **Texture) -> bool { texture_imgui(name
 do_custom_imgui :: (name: string, array: *[..] $T) -> bool {
     changes := false;
     
-    if ImGui.CollapsingHeader(name.data) {
+    if ImGui.CollapsingHeader(tprint("% (Array)", name, name).data) {
         ImGui.Indent();
         
-        if ImGui.Button("Add item") {
+        if ImGui.Button(tprint("Add item##%", name).data) {
             value: T;
             array_add(array, value);
         }
@@ -336,12 +345,16 @@ do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
 {
     changes := false;
     
+    ImGui.PushID(name.data);
+    
     info := cast(*Type_Info_Struct) T;
     if ImGui.CollapsingHeader(name.data) {
         ImGui.Indent();
         #insert #run do_custom_imgui_helper(type_info(T));
         ImGui.Unindent();
     }
+    
+    ImGui.PopID();
     
     return changes;
 }
@@ -360,7 +373,6 @@ moving_entities: bool;
 
 texture_picker_target: **Texture;
 
-current_level_name: string;
 level_name: string;
 
 search_text: [64] u8;
@@ -415,25 +427,6 @@ entities_inside_rect :: (pos: Vec2, size: Vec2) -> [] *Entity {
         if rect_inside_rect(it.position, get_entity_size(it), pos, size) array_add(*array, it);
     }
     return array;
-}
-
-do_editor_state_imgui :: () {
-    ImGui.Begin("Editor state");
-    ImGui.Text("mouse_position: %", mouse_position);
-    ImGui.Text("dragging: %", dragging);
-    ImGui.Text("drag_origin: %", drag_origin);
-    ImGui.Text("moving_entities: %", moving_entities);
-    ImGui.Text("x_axis: %", x_axis);
-    ImGui.Text("y_axis: %", y_axis);
-    drag_size := abs(mouse_position - drag_origin);
-    ImGui.Text("drag_size: %", mouse_position - drag_origin);
-    if ImGui.CollapsingHeader("Selected Entities") {
-        for selected_entities {
-            ImGui.Text("%: %", it.id, entity_type_names[it.class]);
-        }
-    }
-    
-    ImGui.End();
 }
 
 #import "Math";

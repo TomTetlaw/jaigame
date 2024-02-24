@@ -1,7 +1,16 @@
 
 camera_position: Vec2;
+render_size: Vec2;
+render_half_size: Vec2;
 
-renderer_init :: () {
+set_camera_position :: (position: Vec2) {
+    camera_position = position;
+}
+
+renderer_init :: (screen_size: Vec2) {
+    render_size = screen_size;
+    render_half_size = screen_size * 0.5;
+        
     verts: [4] Vertex;
     verts[0].position = v3(-0.5, 0.5, 0);
     verts[0].tex_coord = v2(0, 0);
@@ -31,6 +40,8 @@ renderer_init :: () {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, size_of(Vertex), xx 0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Vertex), xx size_of(Vec3));
+    
+    set_camera_position(v2(0,0));
 }
 
 draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }) {

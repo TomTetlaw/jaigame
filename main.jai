@@ -1,7 +1,7 @@
 
 main :: () {
-    window_width := 1366;
-    window_height := 768;
+    window_width := 1920*.9;
+    window_height := 1080*.9;
     
     SDL_Init(SDL_INIT_EVERYTHING);
     window := SDL_CreateWindow("Final", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, xx window_width, xx window_height, SDL_WINDOW_OPENGL);
@@ -22,7 +22,7 @@ main :: () {
     
     load_all_textures();
     
-    renderer_init();
+    renderer_init(v2(xx window_width, xx window_height));
     editor_init();
         
     imgui_context := ImGui.CreateContext();
@@ -44,7 +44,7 @@ main :: () {
         
         ImGui_ImplSdl_NewFrame(window);
         ImGui.NewFrame();
-        editor_do_imgui();
+        if editor_open editor_do_imgui();
         
         renderer_begin_frame();
         render_all_entities();
@@ -67,17 +67,17 @@ process_window_events :: () -> bool {
             if event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEBUTTONDOWN ||
                event.type == SDL_MOUSEMOTION {
                 if editor_open editor_handle_mouse_event(*event);
+                else game_handle_mouse_event(*event);
             }
         }
         
         if !imgui_io.WantCaptureKeyboard {
             if event.type == SDL_KEYUP || event.type == SDL_KEYDOWN {
                 if editor_open editor_handle_keyboard_event(*event);
+                else game_handle_keyboard_event(*event);
             }
         }
     }
-    
-    i := alloc(1);
     
     return false;
 }
