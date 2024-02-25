@@ -193,7 +193,6 @@ generate_code :: (codegen: *Codegen) -> string {
     append(*builder, "HERE\n\n");
     
     append(*builder, "array_for_entity :: ($T: Type) -> *Bucket_Array(T, ENTITY_BUCKET_SIZE) {\n");
-    append(*builder, "    entity_list := *context.entity_list;\n");
     for codegen.entity_structs {
         append(*builder, tprint("    #if T == % return *entity_list._%;\n", it.name, it.name));
     }
@@ -202,7 +201,6 @@ generate_code :: (codegen: *Codegen) -> string {
     append(*builder, "}\n");
     
     append(*builder, "remove_entity :: (entity: *Entity) {\n");
-    append(*builder, "    entity_list := *context.entity_list;\n");
     append(*builder, "    array_unordered_remove_by_value(*entity_list.active_entities, entity);\n");
     for codegen.entity_structs {
         append(*builder, tprint("    if entity.class == _% bucket_array_remove(*entity_list._%, entity.locator);\n", it.name, it.name));
@@ -210,7 +208,6 @@ generate_code :: (codegen: *Codegen) -> string {
     append(*builder, "}\n");
     
     append(*builder, "remove_all_entities :: () {\n");
-    append(*builder, "    entity_list := *context.entity_list;\n");
     append(*builder, "entity_list.active_entities.count = 0;\n");
     for codegen.entity_structs {
         append(*builder, tprint("for entity_list._% remove it;\n", it.name));
@@ -218,7 +215,6 @@ generate_code :: (codegen: *Codegen) -> string {
     append(*builder, "}\n");
     
     append(*builder, "get_entity_from_locator :: (ref: Entity_Ref) -> *Entity {\n");
-    append(*builder, "    entity_list := *context.entity_list;\n");
     for codegen.entity_structs {
         append(*builder, tprint("    if ref.class == _% return bucket_array_get(*entity_list._%, ref.locator);\n", it.name, it.name));
     }

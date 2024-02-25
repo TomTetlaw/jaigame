@@ -1,6 +1,5 @@
 
 update_entity_physics :: () {
-    entity_list := *context.entity_list;
     for entity_list.active_entities {
         if !(it.flags & .Physics) continue;
         

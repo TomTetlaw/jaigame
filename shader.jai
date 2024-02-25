@@ -1,8 +1,43 @@
 
 Shader :: struct {
     program: u32;
-    uniforms: [] s32;
+    uniforms: [..] s32;
     hash_map: [] int;
+}
+
+get_shader_location :: (shader: *Shader, name: string) -> s32 {
+    hash_index := get_hash(name) % 1024;
+    index := shader.hash_map[hash_index];
+    loc := shader.uniforms[index];
+    log_vars(hash_index);
+    return loc;
+}
+
+set_shader_int :: (shader: *Shader, name: string, value: s32) {
+    loc := get_shader_location(shader, name);
+    glUniform1i(loc, value);
+}
+
+set_shader_vec2 :: (shader: *Shader, name: string, value: Vec2) {
+    loc := get_shader_location(shader, name);
+    glUniform2f(loc, value.x, value.y);
+}
+
+set_shader_vec4 :: (shader: *Shader, name: string, value: Vec4) {
+    loc := get_shader_location(shader, name);
+    glUniform4f(loc, value.x, value.y, value.z, value.w);
+}
+
+set_shader_mat4 :: (shader: *Shader, name: string, value: Mat4, transpose := false) {
+    loc := get_shader_location(shader, name);
+    glUniformMatrix4fv(loc, 1, ifx transpose then GL_TRUE else GL_FALSE, cast (*float) *value);
+}
+
+set_shader_texture :: (shader: *Shader, name: string, value: u32, unit: u32) {
+    loc := get_shader_location(shader, name);
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, value);
+    glUniform1ui(loc, unit);
 }
 
 make_shader_program :: (shader_text: string) -> Shader {
@@ -79,8 +114,9 @@ make_shader_program :: (shader_text: string) -> Shader {
         return .{};
     }
     
-    uniforms: [..] s32;
-    hash_map: [1024] int;
+    shader: Shader;
+    shader.program = shader_p;
+    shader.hash_map = NewArray(1024, int);
     
     active_uniform_count: s32;
     glGetProgramiv(shader_p, GL_ACTIVE_UNIFORMS, *active_uniform_count);
@@ -92,16 +128,15 @@ make_shader_program :: (shader_text: string) -> Shader {
         glGetActiveUniform(shader_p, xx it, 128, *length, *size, *type, buffer.data);
         loc := glGetUniformLocation(shader_p, buffer.data);
         
-        array_add(*uniforms, loc);
-        hash_map[get_hash(cast(string) buffer) % 1024] = it;
+        uniform_name := cast(string) buffer;
+        uniform_name.count = c_style_strlen(buffer.data);
+        hash_index := get_hash(uniform_name) % 1024;
+        shader.hash_map[hash_index] = shader.uniforms.count;
+        array_add(*shader.uniforms, loc);
     }
-    
-    shader: Shader;
-    shader.program = shader_p;
-    shader.uniforms = uniforms;
-    shader.hash_map = hash_map;
     
     return shader;
 }
 
 #import "Hash";
+#import "Print_Vars";

@@ -42,26 +42,17 @@ HERE
 
 basic_shader: Shader;
 
-prepare_basic_shader :: (position: Vec2, size: Vec2, colour: Vec4, texture: u32) {
-    program := basic_shader.program;
+prepare_basic_shader :: (args: *Basic_Command) {
+    final_position := args.position - camera_position + render_half_size;
+    position_size := Vec4.{final_position.x, final_position.y, args.size.x, args.size.y};
+    projection := orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     
-    glUseProgram(program);
+    glUseProgram(basic_shader.program);
     
-    position_size_loc := glGetUniformLocation(program, "position_size");
-    final_position := position - camera_position + render_half_size;
-    glUniform4f(position_size_loc, final_position.x, final_position.y, size.x, size.y);
-    
-    projection: Matrix4 = orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
-    projection_loc := glGetUniformLocation(program, "projection_matrix");
-    glUniformMatrix4fv(projection_loc, 1, GL_TRUE, cast (*float) *projection);
-    
-    colour_loc := glGetUniformLocation(program, "colour");
-    glUniform4f(colour_loc, colour.x, colour.y, colour.z, colour.w);
-    
-    texture_loc := glGetUniformLocation(program, "base_texture");
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glUniform1i(texture_loc, 0);
+    set_shader_vec4(*basic_shader, "position_size", position_size);
+    set_shader_mat4(*basic_shader, "projection_matrix", xx projection, true);
+    set_shader_vec4(*basic_shader, "colour", args.colour);
+    set_shader_texture(*basic_shader, "base_texture", args.texture, 0);
 }
 
 // -------------------------------------------
@@ -108,21 +99,16 @@ HERE
 
 coloured_shader: Shader;
 
-prepare_coloured_shader :: (position: Vec2, size: Vec2, colour: Vec4) {
-    program := coloured_shader.program;
+prepare_coloured_shader :: (args: *Coloured_Command) {
+    final_position := args.position - camera_position + render_half_size;
+    position_size := Vec4.{final_position.x, final_position.y, args.size.x, args.size.y};
+    projection := orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     
-    glUseProgram(program);
-
-    final_position := position - camera_position + render_half_size;
-    position_size_loc := glGetUniformLocation(program, "position_size");
-    glUniform4f(position_size_loc, final_position.x, final_position.y, size.x, size.y);
+    glUseProgram(coloured_shader.program);
     
-    projection: Matrix4 = orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
-    projection_loc := glGetUniformLocation(program, "projection_matrix");
-    glUniformMatrix4fv(projection_loc, 1, GL_TRUE, cast (*float) *projection);
-    
-    colour_loc := glGetUniformLocation(program, "colour");
-    glUniform4f(colour_loc, colour.x, colour.y, colour.z, colour.w);
+    set_shader_vec4(*basic_shader, "position_size", position_size);
+    set_shader_mat4(*basic_shader, "projection_matrix", xx projection, true);
+    set_shader_vec4(*basic_shader, "colour", args.colour);    
 }
 
 // -------------------------------------------

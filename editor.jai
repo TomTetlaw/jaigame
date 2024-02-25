@@ -13,7 +13,6 @@ editor_init :: () {
 render_editor :: () {
     if !editor_open return;
 
-    entity_list := *context.entity_list;
     for entity_list.active_entities {
         position := it.position;
         size := get_entity_size(it);
@@ -147,7 +146,6 @@ editor_do_imgui :: () {
             ImGui.EndTabItem();
         }
         if ImGui.BeginTabItem("All Entities") {
-            entity_list := *context.entity_list;
             for entity_list.active_entities {
                 if ImGui.Button(tprint("% (%)", it.id, entity_type_names[it.class]).data) {
                     selected_entities.count = 0;
@@ -180,7 +178,7 @@ editor_handle_keyboard_event :: (event: *SDL_Event) {
     if event.key.keysym.scancode == SDL_SCANCODE_DELETE {
         for selected_entities remove_entity(it);
         selected_entities.count = 0;
-    } else if event.key.keysym.scancode == SDL_SCANCODE_F5 {
+    } else if event.key.keysym.scancode == SDL_SCANCODE_F11 {
         editor_save_level();
         start_game();
     } else if event.key.keysym.scancode == SDL_SCANCODE_F {
@@ -259,7 +257,8 @@ texture_picker_sizes := Vec2.[
 texture_picker_size_index := 0;
 
 texture_imgui :: (name: string, texture: **Texture) {
-    if ImGui.Button(tprint("% (Click to set texture)", name).data) texture_picker_target = texture;
+    path := ifx <<texture then (<<texture).path else "none";
+    if ImGui.Button(tprint("% (%) (Click to set texture)", name, path).data) texture_picker_target = texture;
 }
 
 do_texture_picker_imgui :: () -> *Texture {
@@ -278,7 +277,9 @@ do_texture_picker_imgui :: () -> *Texture {
     for _all_textures {
         if it_index % 8 != 0 ImGui.SameLine();
         imgui_size: ImGui.ImVec2 = .{ xx size.x, xx size.y };
+
         if ImGui.ImageButton(it.path.data, cast(*void)it.object, imgui_size) return it;
+        if ImGui.IsItemHovered() ImGui.SetTooltip(it.path);
     }
     
     return null;
@@ -383,7 +384,6 @@ search_text: [64] u8;
 search_entities: [..] *Entity;
 
 search_by_class :: (class: string) -> [..] *Entity {
-    entity_list := *context.entity_list;
     out := tarray(*Entity);
     for entity_list.active_entities {
         if contains_nocase(entity_type_names[it.class], class) array_add(*out, it);
@@ -401,7 +401,6 @@ Axis :: struct {
 x_axis, y_axis: Axis;
 
 find_entity_under_point :: (point: Vec2) -> *Entity {
-    entity_list := *context.entity_list;
     for entity_list.active_entities {
         if point_inside_rect(point, it.position, get_entity_size(it)) return it;
     }
@@ -426,7 +425,6 @@ rect_inside_rect :: (a_pos: Vec2, a_size: Vec2, b_pos: Vec2, b_size: Vec2) -> bo
 
 entities_inside_rect :: (pos: Vec2, size: Vec2) -> [] *Entity {
     array := tarray(*Entity);
-    entity_list := *context.entity_list;
     for entity_list.active_entities {
         if rect_inside_rect(it.position, get_entity_size(it), pos, size) array_add(*array, it);
     }

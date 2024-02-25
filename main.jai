@@ -39,16 +39,18 @@ main :: () {
         exit = process_window_events();
         if exit break;
         
-        editor_update();
-        update_game();
+        if editor_open editor_update();
+        if !game_paused update_game();
         
         ImGui_ImplSdl_NewFrame(window);
         ImGui.NewFrame();
         if editor_open editor_do_imgui();
         
-        renderer_begin_frame();
         render_all_entities();
         if editor_open render_editor();
+        render_game();
+
+        renderer_do_commands();
         
         ImGui.Render();
         ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());

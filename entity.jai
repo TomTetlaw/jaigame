@@ -5,12 +5,13 @@ Entity_List :: struct {
 #insert DERIVED_ENTITY_LISTS;
 }
 
-#add_context entity_list: Entity_List;
+entity_list: Entity_List;
 
 Entity_Class :: #type,distinct s32;
 
 Entity_Flags :: enum_flags u32 {
     Physics;
+    CustomRender;
 }
 
 Entity :: struct {
@@ -69,7 +70,6 @@ entity_cast :: (entity: *Entity, $T: Type) -> *T {
 }
 
 create_entity :: ($T: Type, id: int = -1) -> *T {
-    entity_list := *context.entity_list; 
     array := array_for_entity(T);
     
     dummy: T;
@@ -93,31 +93,20 @@ create_entity :: ($T: Type, id: int = -1) -> *T {
 }
 
 render_all_entities :: () {
-    entity_list := *context.entity_list;
     for entity_list.active_entities {
+        if it.flags & .CustomRender continue;
+        
         position := it.position;
         size := get_entity_size(it);
         texture := it.texture;
         colour := it.colour;
         
-        if texture draw_texture(texture, position, colour);
+        if texture draw_texture(texture, position, colour, size);
         else draw_quad(position, size, colour);
     }
 }
 
-find_entities_by_class :: (class: Entity_Class) -> [..] *Entity {
-    out: [..] *Entity;
-    
-    entity_list := *context.entity_list;
-    for entity_list.active_entities {
-        if it.class == class array_add(*out, it);
-    }
-    
-    return out;
-}
-
 save_level :: (level_name: string) {
-    entity_list := *context.entity_list;
     make_directory_if_it_does_not_exist(tprint("levels/%", level_name));
     
     path := level_name;
@@ -230,30 +219,37 @@ serialize :: (builder: *String_Builder, name: string, value: *$T) #modify {
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *int) { 
     v := table_find_pointer(values, name);
     if v then <<value = parse_int(v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *float) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_float(v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *bool) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_bool(v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec2) { 
     v := table_find_pointer(values, name);
     if v then <<value = parse_vec2(<<v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec4) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_vec4(<<v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Colour) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_colour(<<v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: **Texture) {
     v := table_find_pointer(values, name);
     if v then <<value = texture_for_path(<<v);
+    else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, array: *[..] $T) {
     v := table_find_pointer(values, tprint("%.count", name));
@@ -264,11 +260,12 @@ deserialize :: (values: *Table(string, string), version: int, name: string, arra
         for 0..count-1 {
             deserialize(values, version, tprint("%[%]", name, it), *array.data[it]);
         }
-    }
+    } else log("couldn't deserialize field %.count (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Entity_Flags) {
     v := table_find_pointer(values, name);
     if v then <<value = cast(Entity_Flags) parse_int(v);
+    else log("couldn't deserialize field % (not found)", name);
 }
 
 deserialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {

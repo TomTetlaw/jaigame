@@ -44,43 +44,72 @@ renderer_init :: (screen_size: Vec2) {
     set_camera_position(v2(0,0));
 }
 
-draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }) {
-    prepare_basic_shader(position, .{ xx texture.width, xx texture.height }, colour, texture.object);
-    glBindVertexArray(vertex_array);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
+draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}) {
+    size := custom_size;
+    if custom_size.x == -1 || custom_size.y == -1 {
+        size = .{ xx texture.width, xx texture.height };
+    }
+    
+    basic: Draw_Command;
+    basic.type = .Basic;
+    basic.basic = .{position, size, colour, texture.object};
+    add_render_command(basic);
 }
 
 draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }) {
-    prepare_coloured_shader(position, size, colour);
-    glBindVertexArray(vertex_array);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
+    coloured: Draw_Command;
+    coloured.type = .Coloured;
+    coloured.coloured = .{position, size, colour};
+    add_render_command(coloured);
 }
 
 draw_wireframe_quad :: (position: Vec2, size: Vec2, thickness: float, colour: Vec4 = .{ 1, 1, 1, 1 }) {
     top_position := position + Vec2.{ 0, size.y * 0.5 - thickness * 0.5 };
     top_size := Vec2.{ size.x, thickness };
-    prepare_coloured_shader(top_position, top_size, colour);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
-    
     bottom_position := position - Vec2.{ 0, size.y * 0.5 - thickness * 0.5 };
     bottom_size := Vec2.{ size.x, thickness };
-    prepare_coloured_shader(bottom_position, bottom_size, colour);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
-    
     left_position := position - Vec2.{ size.x * 0.5 - thickness * 0.5, 0 };
     left_size := Vec2.{ thickness, size.y };
-    prepare_coloured_shader(left_position, left_size, colour);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
-    
     right_position := position + Vec2.{ size.x * 0.5 - thickness * 0.5, 0 };
     right_size := Vec2.{ thickness, size.y };
-    prepare_coloured_shader(right_position, right_size, colour);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
+    
+    coloured0: Draw_Command;
+    coloured0.type = .Coloured;
+    coloured0.coloured = .{top_position, top_size, colour};
+    add_render_command(coloured0);
+    
+    coloured1: Draw_Command;
+    coloured1.type = .Coloured;
+    coloured1.coloured = .{bottom_position, bottom_size, colour};
+    add_render_command(coloured1);
+    
+    coloured2: Draw_Command;
+    coloured2.type = .Coloured;
+    coloured2.coloured = .{left_position, left_size, colour};
+    add_render_command(coloured2);
+    
+    coloured3: Draw_Command;
+    coloured3.type = .Coloured;
+    coloured3.coloured = .{right_position, right_size, colour};
+    add_render_command(coloured3);
 }
 
-renderer_begin_frame :: () {
+renderer_do_commands :: () {
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT);
+    
+    for render_commands {
+        if it.type == {
+            case .Basic;
+                prepare_basic_shader(*it.basic);
+            case .Coloured;
+                prepare_coloured_shader(*it.coloured);
+        }
+        
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
+    }
+    
+    render_commands.count = 0;
 }
 
 bind_textures :: (textures: [] u32) {
@@ -92,7 +121,39 @@ bind_textures :: (textures: [] u32) {
     }
 }
 
+Draw_Command_Type :: enum {
+    Basic;
+    Coloured;
+}
+
+Basic_Command :: struct {
+    position: Vec2;
+    size: Vec2;
+    colour: Vec4;
+    texture: u32;
+}
+
+Coloured_Command :: struct {
+    position: Vec2;
+    size: Vec2;
+    colour: Vec4;
+}
+
+Draw_Command :: struct {
+    type: Draw_Command_Type;
+    union {
+        basic: Basic_Command;
+        coloured: Coloured_Command;
+    }
+}
+
 #scope_file
+
+render_commands: [..] Draw_Command;
+
+add_render_command :: (command: Draw_Command) {
+    array_add(*render_commands, command);
+}
 
 Vertex :: struct {
     position: Vec3;

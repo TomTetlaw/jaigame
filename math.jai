@@ -27,6 +27,7 @@ Vec4 :: struct {
 }
 
 Colour :: #type,isa Vec4;
+Mat4 :: #type,isa Matrix4;
 
 v2 :: (x: float, y: float) -> Vec2 { return .{ x, y }; }
 v2f :: (v: float) -> Vec2 { return .{ v, v }; }

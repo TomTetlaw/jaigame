@@ -3,36 +3,8 @@ Player :: struct {
     using #as base: Entity;
     VERSION :: 1;
     
-    base.approach_speed = 1000;
-    
+    base.approach_speed = 1000;   
     move_speed := 300.0;
-}
-
-Prop :: struct {
-    using #as base: Entity;
-    VERSION :: 1;
-}
-
-Blocker :: struct {
-    using #as base: Entity;
-    VERSION :: 1;
-}
-
-Test_Struct :: struct {
-    my_int2: int;
-    my_float2: float;
-}
-
-Enemy :: struct {
-    using #as base: Entity;
-    VERSION :: 1;
-    
-    my_int1: int;
-    my_float1: float;
-    my_struct: Test_Struct;
-    my_bool: bool;
-    
-    my_colour: Colour; @v2-4
 }
 
 Parallax_Layer :: struct {
@@ -40,14 +12,16 @@ Parallax_Layer :: struct {
     
     position: Vec2;
     texture: *Texture;
-    move_rate: float;
+    colour: Colour = .{1, 1, 1, 1};
+    lag_amount: float;
 } 
 
 Parallax_Background :: struct {
     using #as base: Entity;
     VERSION :: 1;
     
-    ints: [..] int;
+    base.flags = .CustomRender;
+    
     layers: [..] Parallax_Layer;
 }
 
@@ -57,9 +31,6 @@ game_paused: bool;
 
 default_texture_for_entity :: (class: Entity_Class) -> *Texture {
     if class == _Player return _texture_player;
-    if class == _Prop return _texture_hall;
-    if class == _Blocker return _texture_box;
-    if class == _Enemy return _texture_skeleton;
     return null;
 }
 
@@ -69,10 +40,11 @@ game_handle_mouse_event :: (event: *SDL_Event) {
 player_move: [2] bool;
 
 game_handle_keyboard_event :: (event: *SDL_Event) {
-    if event.key.keysym.scancode == SDL_SCANCODE_ESCAPE {
+    if event.key.keysym.scancode == SDL_SCANCODE_F11 {
         editor_open = true;
         game_paused = true;
         load_level(current_level_name);
+        set_camera_position(v2(0,0));
     }
 
     if !player return;    
@@ -87,13 +59,31 @@ start_game :: () {
     editor_open = false;
     game_paused = false;
     
-    players := find_entities_by_class(_Player);
+    players := entity_list._Player;
     if players.count != 1 {
         log("There needs to be exactly one player in the level");
         return;
     }
     
-    player = entity_cast(players[0], Player);
+    player = *players[0];
+}
+
+render_parallax_backgrounds :: () {
+    for entity_list._Parallax_Background {
+        for layer: it.layers {
+            if !layer.texture continue;
+            draw_texture(layer.texture, layer.position, layer.colour);
+        }
+    }
+}
+
+update_parallax_backgrounds :: () {
+    for entity_list._Parallax_Background {
+        distance := player.position.x;
+        for * layer: it.layers {
+            layer.position.x = distance * layer.lag_amount;
+        }
+    }
 }
 
 update_game :: () {
@@ -112,6 +102,8 @@ update_game :: () {
     delta_time = cast(float) delta_time_64;
 
     update_entity_physics();
+
+    update_parallax_backgrounds();
     
     if !player return;
     player.goal_velocity = v2(0, 0);
@@ -119,6 +111,10 @@ update_game :: () {
     if player_move[1] player.goal_velocity.x = player.move_speed;
     
     set_camera_position(player.position);
+}
+
+render_game :: () {
+    render_parallax_backgrounds();
 }
 
 #scope_file
