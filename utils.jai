@@ -74,6 +74,19 @@ parse_colour :: (s: string) -> Colour {
     return .{x, y, z, w};
 }
 
+find_note :: (notes: [] string, note: string) -> bool {
+    for notes if equal(it, note) return true;
+    return false;
+}
+
+not_easy_struct :: (info: *Type_Info) -> bool {
+    if info.type != .STRUCT return false;
+    s_type_info := cast(*Type_Info_Struct) info;
+    if s_type_info.name == "Vec2" return false;
+    if s_type_info.name == "Vec4" return false;
+    return true;
+}
+
 #import "Basic";
 #import "String";
 #import "Random";

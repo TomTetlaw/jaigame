@@ -10,18 +10,23 @@ Entity_List :: struct {
 Entity_Class :: #type,distinct s32;
 
 Entity_Flags :: enum_flags u32 {
+    Physics;
 }
 
 Entity :: struct {
-    id: int;                 @no_imgui @no_serialize
-    locator: Bucket_Locator; @no_imgui @no_serialize
-    class: Entity_Class;     @no_imgui @no_serialize
-    flags: Entity_Flags;     @no_imgui
+    id: int;                            @no_imgui @no_serialize
+    locator: Bucket_Locator;            @no_imgui @no_serialize
+    class: Entity_Class;                @no_imgui @no_serialize
+    flags: Entity_Flags = .Physics;     @no_imgui
     
     position: Vec2;
     size := Vec2.{ -1, -1 };
     colour := Colour.{ 1, 1, 1, 1 };
     texture: *Texture;
+    
+    velocity: Vec2;
+    goal_velocity: Vec2;
+    approach_speed := 100.0;
 }
 
 get_entity_size :: (using entity: *Entity) -> Vec2 {
@@ -100,6 +105,17 @@ render_all_entities :: () {
     }
 }
 
+find_entities_by_class :: (class: Entity_Class) -> [..] *Entity {
+    out: [..] *Entity;
+    
+    entity_list := *context.entity_list;
+    for entity_list.active_entities {
+        if it.class == class array_add(*out, it);
+    }
+    
+    return out;
+}
+
 save_level :: (level_name: string) {
     entity_list := *context.entity_list;
     make_directory_if_it_does_not_exist(tprint("levels/%", level_name));
@@ -111,7 +127,7 @@ save_level :: (level_name: string) {
     
     for entity_list.active_entities {
         file_name := tprint("levels/%/%_%.entity", path, it.id, it.class);
-        string_to_write := save_entity(file_name, it);
+        string_to_write := serialize_entity(it);
         write_entire_file(file_name, string_to_write);
     }
 }
@@ -145,19 +161,156 @@ load_level :: (level_name: string) {
             table_add(*members, name, value);
         }
         
-        load_entity(e, version, *members);
+        deserialize_entity(e, version, *members);
     }
 }
 
-find_entities_by_class :: (class: Entity_Class) -> [..] *Entity {
-    out: [..] *Entity;
+serialize :: (builder: *String_Builder, name: string, value: *int) { 
+    append(builder, tprint("% = %\n", name, <<value));
+}
+serialize :: (builder: *String_Builder, name: string, value: *float) {
+    append(builder, tprint("% = %\n", name, <<value));
+}
+serialize :: (builder: *String_Builder, name: string, value: *bool) {
+    append(builder, tprint("% = %\n", name, <<value));
+}
+serialize :: (builder: *String_Builder, name: string, value: *Vec2) { 
+    append(builder, tprint("% = %,%\n", name, value.x, value.y));
+}
+serialize :: (builder: *String_Builder, name: string, value: *Vec4) {
+    append(builder, tprint("% = %,%,%,%\n", name, value.x, value.y, value.z, value.w));
+}
+serialize :: (builder: *String_Builder, name: string, value: *Colour) {
+    vec := <<value;
+    append(builder, tprint("% = %,%,%,%\n", name, vec.x, vec.y, vec.z, vec.w));
+}
+serialize :: (builder: *String_Builder, name: string, value: **Texture) {
+    if !<<value append(builder, tprint("% = none\n", name));
+    else append(builder, tprint("% = %\n", name, (<<value).path));
+}
+serialize :: (builder: *String_Builder, name: string, array: *[..] $T) {
+    append(builder, tprint("%.count = %\n", name, array.count));
+    for * <<array {
+        serialize(builder, tprint("%[%]", name, it_index), it);
+    }
+}
+serialize :: (builder: *String_Builder, name: string, value: *Entity_Flags) {
+    append(builder, tprint("% = %\n", name, cast(int) (<<value)));
+}
+
+serialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
+    builder: String_Builder;
     
-    entity_list := *context.entity_list;
-    for entity_list.active_entities {
-        if it.class == class array_add(*out, it);
+    s := cast(*Type_Info_Struct) info;
+    for s.members {
+        if find_note(it.notes, "no_serialize") continue;
+        if equal(it.name, "VERSION") continue;
+        
+        if it.type.type == .STRUCT && not_easy_struct(it.type) {
+            prefix := tprint("%0%.", member_prefix, it.name);
+            append(*builder, serialize_helper(it.type, prefix));
+        } else {
+            append(*builder, tprint("serialize(builder, tprint(\"%%.%0%\", name), *%0%);\n", member_prefix, it.name, member_prefix, it.name));
+        }
     }
     
+    out := builder_to_string(*builder);
     return out;
+}
+
+serialize :: (builder: *String_Builder, name: string, value: *$T) #modify {
+    s := cast(*Type_Info) T;
+    return s.type == .STRUCT;
+}
+{
+    info := cast(*Type_Info_Struct) T;
+    #insert #run serialize_helper(type_info(T));
+}
+
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *int) { 
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_int(v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *float) {
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_float(v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *bool) {
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_bool(v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec2) { 
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_vec2(<<v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec4) {
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_vec4(<<v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *Colour) {
+    v := table_find_pointer(values, name);
+    if v then <<value = parse_colour(<<v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: **Texture) {
+    v := table_find_pointer(values, name);
+    if v then <<value = texture_for_path(<<v);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, array: *[..] $T) {
+    v := table_find_pointer(values, tprint("%.count", name));
+    if v {
+        count := parse_int(v);
+        array_reserve(array, count);
+        array.count = count;
+        for 0..count-1 {
+            deserialize(values, version, tprint("%[%]", name, it), *array.data[it]);
+        }
+    }
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *Entity_Flags) {
+    v := table_find_pointer(values, name);
+    if v then <<value = cast(Entity_Flags) parse_int(v);
+}
+
+deserialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
+    builder: String_Builder;
+    
+    s := cast(*Type_Info_Struct) info;
+    for s.members {
+        if find_note(it.notes, "no_serialize") continue;
+        if equal(it.name, "VERSION") continue;
+
+        version_min := 1;
+        version_max := 9999;
+        for note: it.notes {
+            if note[0] == #char "v" {
+                success := scan2(note, "v%-%", *version_min, *version_max);
+                if !success {
+                    scan2(note, "v%", *version_min);
+                }
+            }
+        }
+        
+        append(*builder, tprint("if version >= % && version <= % {\n", version_min, version_max));
+        if it.type.type == .STRUCT && not_easy_struct(it.type) {
+            prefix := tprint("%0%.", member_prefix, it.name);
+            append(*builder, deserialize_helper(it.type, prefix));
+        } else {
+            append(*builder, tprint("deserialize(values, version, tprint(\"%%.%0%\", name), *%0%);\n", member_prefix, it.name, member_prefix, it.name));
+        }
+        append(*builder, tprint("}\n"));
+    }
+    
+    out := builder_to_string(*builder);
+    return out;
+}
+
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *$T) #modify {
+    s := cast(*Type_Info) T;
+    return s.type == .STRUCT;
+}
+{
+    info := cast(*Type_Info_Struct) T;
+    #insert #run deserialize_helper(type_info(T));
 }
 
 ENTITY_BUCKET_SIZE :: 256;

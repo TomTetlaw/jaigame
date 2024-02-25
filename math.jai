@@ -4,7 +4,7 @@ Vec2 :: struct {
     y: float;
     
     #place x;
-    component: [2] float = ---; @no_imgui
+    component: [2] float = ---; @no_imgui @no_serialize
 }
 
 Vec3 :: struct {
@@ -13,7 +13,7 @@ Vec3 :: struct {
     z: float;
     
     #place x;
-    component: [3] float = ---; @no_imgui
+    component: [3] float = ---; @no_imgui @no_serialize
 }
 
 Vec4 :: struct {
@@ -23,7 +23,7 @@ Vec4 :: struct {
     w: float;
     
     #place x;
-    component: [4] float = ---; @no_imgui
+    component: [4] float = ---; @no_imgui @no_serialize
 }
 
 Colour :: #type,isa Vec4;
@@ -58,6 +58,20 @@ lerp :: (a: Vec2, b: Vec2, t: float) -> Vec2 {
 
 lerp :: (a: Vec4, b: Vec4, t: float) -> Vec4 {
     return .{ lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t), lerp(a.w, b.w, t) };
+}
+
+approach :: (current: float, goal: float, dt: float) -> float {
+    delta := goal - current;
+    if delta < -dt return current - dt;
+    if delta > dt return current + dt;
+    return goal;
+}
+
+approach :: (current: Vec2, goal: Vec2, dt: float) -> Vec2 {
+    out: Vec2;
+    out.x = approach(current.x, goal.x, dt);
+    out.y = approach(current.y, goal.y, dt);
+    return out;
 }
 
 operator == :: (a: Vec2, b: Vec2) -> bool {

@@ -103,7 +103,11 @@ editor_do_imgui :: () {
             ImGui.OpenPopup("Unsaved changes");
         } else editor_load_level();
     }
-    if ImGui.Button("Clear level") remove_all_entities();
+    if ImGui.Button("Clear level") {
+        remove_all_entities();
+        selected_entities.count = 0;
+    }
+    
     if editor_unsaved_changes ImGui.Text("Unsaved changes!");
     
     if ImGui.BeginPopupModal("Unsaved changes") {
@@ -316,11 +320,6 @@ do_custom_imgui :: (name: string, array: *[..] $T) -> bool {
     return changes;
 }
 
-find_note :: (notes: [] string, note: string) -> bool {
-    for notes if equal(it, note) return true;
-    return false;
-}
-
 do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
     builder: String_Builder;
     
@@ -331,7 +330,12 @@ do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> strin
         // :HACK for entities
         if equal(it.name, "VERSION") continue;
         
-        append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
+        if it.type.type == .STRUCT && not_easy_struct(it.type) {
+            prefix := tprint("%0%.", member_prefix, it.name);
+            append(*builder, do_custom_imgui_helper(it.type, prefix));
+        } else {
+            append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
+        }
     }
     
     out := builder_to_string(*builder);

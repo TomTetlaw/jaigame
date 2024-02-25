@@ -2,6 +2,10 @@
 Player :: struct {
     using #as base: Entity;
     VERSION :: 1;
+    
+    base.approach_speed = 1000;
+    
+    move_speed := 300.0;
 }
 
 Prop :: struct {
@@ -28,10 +32,12 @@ Enemy :: struct {
     my_struct: Test_Struct;
     my_bool: bool;
     
-    my_colour: Colour; @v1
+    my_colour: Colour; @v2-4
 }
 
 Parallax_Layer :: struct {
+    VERSION :: 1;
+    
     position: Vec2;
     texture: *Texture;
     move_rate: float;
@@ -45,8 +51,8 @@ Parallax_Background :: struct {
     layers: [..] Parallax_Layer;
 }
 
-dt32: float;
-delta_time, real_time, game_time, old_time: float64;
+delta_time: float; // game code uses float32 so use this to avoid having to cast
+delta_time_64, real_time, game_time, old_time: float64;
 game_paused: bool;
 
 default_texture_for_entity :: (class: Entity_Class) -> *Texture {
@@ -97,18 +103,20 @@ update_game :: () {
     real_time = to_float64_seconds(now);
     
     if !game_paused {
-        delta_time = real_time - old_time;
+        delta_time_64 = real_time - old_time;
         game_time += delta_time;
     } else {
-        delta_time = 0.0;
+        delta_time_64 = 0.0;
     }
     
-    dt32 = cast(float) delta_time;
+    delta_time = cast(float) delta_time_64;
+
+    update_entity_physics();
     
     if !player return;
-    
-    if player_move[0] player.position.x -= 100 * dt32;
-    if player_move[1] player.position.x += 100 * dt32;
+    player.goal_velocity = v2(0, 0);
+    if player_move[0] player.goal_velocity.x = -player.move_speed;
+    if player_move[1] player.goal_velocity.x = player.move_speed;
     
     set_camera_position(player.position);
 }
