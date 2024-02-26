@@ -1,5 +1,6 @@
 
 camera_position: Vec2;
+camera_focus_point: Vec2;
 render_size: Vec2;
 render_half_size: Vec2;
 
@@ -10,7 +11,8 @@ set_camera_position :: (position: Vec2) {
 renderer_init :: (screen_size: Vec2) {
     render_size = screen_size;
     render_half_size = screen_size * 0.5;
-        
+    camera_focus_point = render_half_size;
+    
     verts: [4] Vertex;
     verts[0].position = v3(-0.5, 0.5, 0);
     verts[0].tex_coord = v2(0, 0);
@@ -44,7 +46,7 @@ renderer_init :: (screen_size: Vec2) {
     set_camera_position(v2(0,0));
 }
 
-draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}) {
+draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}, depth := 0) {
     size := custom_size;
     if custom_size.x == -1 || custom_size.y == -1 {
         size = .{ xx texture.width, xx texture.height };
@@ -53,6 +55,7 @@ draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1
     basic: Draw_Command;
     basic.type = .Basic;
     basic.basic = .{position, size, colour, texture.object};
+    basic.depth = depth;
     add_render_command(basic);
 }
 
@@ -94,18 +97,29 @@ draw_wireframe_quad :: (position: Vec2, size: Vec2, thickness: float, colour: Ve
     add_render_command(coloured3);
 }
 
+get_commands_of_type :: (commands: [] Draw_Command, type: Draw_Command_Type) -> [..] Draw_Command {
+    out := tarray(Draw_Command);
+    for commands if it.type == type array_add(*out, it);
+    return out;
+}
+
 renderer_do_commands :: () {
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT);
     
-    for render_commands {
-        if it.type == {
-            case .Basic;
-                prepare_basic_shader(*it.basic);
-            case .Coloured;
-                prepare_coloured_shader(*it.coloured);
-        }
-        
+    commands := array_view(render_commands, 0);
+    quick_sort(commands, (a, b) => a.depth - b.depth);
+    
+    basic_commands := get_commands_of_type(commands, .Basic);
+    coloured_commands := get_commands_of_type(commands, .Coloured);
+    
+    for basic_commands {
+        prepare_basic_shader(*it.basic);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
+    }
+    
+    for coloured_commands {
+        prepare_coloured_shader(*it.coloured);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
     }
     
@@ -141,6 +155,7 @@ Coloured_Command :: struct {
 
 Draw_Command :: struct {
     type: Draw_Command_Type;
+    depth := 0;
     union {
         basic: Basic_Command;
         coloured: Coloured_Command;
@@ -174,3 +189,4 @@ create_buffer :: (target: u32, size: int, data: *void) -> u32 {
 
 #import "Basic";
 #import "GL";
+#import "Sort";

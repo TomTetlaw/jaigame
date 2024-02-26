@@ -43,7 +43,7 @@ HERE
 basic_shader: Shader;
 
 prepare_basic_shader :: (args: *Basic_Command) {
-    final_position := args.position - camera_position + render_half_size;
+    final_position := args.position - camera_position + camera_focus_point;
     position_size := Vec4.{final_position.x, final_position.y, args.size.x, args.size.y};
     projection := orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     
@@ -100,7 +100,7 @@ HERE
 coloured_shader: Shader;
 
 prepare_coloured_shader :: (args: *Coloured_Command) {
-    final_position := args.position - camera_position + render_half_size;
+    final_position := args.position - camera_position + camera_focus_point;
     position_size := Vec4.{final_position.x, final_position.y, args.size.x, args.size.y};
     projection := orthographic_projection_matrix(0, render_size.x, 0, render_size.y, -1, 1);
     

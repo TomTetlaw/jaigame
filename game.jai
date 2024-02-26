@@ -12,6 +12,7 @@ Parallax_Layer :: struct {
     
     position: Vec2;
     texture: *Texture;
+    depth := 0;
     colour: Colour = .{1, 1, 1, 1};
     lag_amount: float;
 } 
@@ -40,11 +41,13 @@ game_handle_mouse_event :: (event: *SDL_Event) {
 player_move: [2] bool;
 
 game_handle_keyboard_event :: (event: *SDL_Event) {
-    if event.key.keysym.scancode == SDL_SCANCODE_F11 {
-        editor_open = true;
-        game_paused = true;
-        load_level(current_level_name);
-        set_camera_position(v2(0,0));
+    if event.type == SDL_KEYUP {
+        if event.key.keysym.scancode == SDL_SCANCODE_F11 {
+            editor_open = true;
+            game_paused = true;
+            load_level(current_level_name);
+            set_camera_position(v2(0,0));
+        }
     }
 
     if !player return;    
@@ -72,7 +75,7 @@ render_parallax_backgrounds :: () {
     for entity_list._Parallax_Background {
         for layer: it.layers {
             if !layer.texture continue;
-            draw_texture(layer.texture, layer.position, layer.colour);
+            draw_texture(layer.texture, layer.position, layer.colour, depth=layer.depth);
         }
     }
 }

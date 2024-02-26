@@ -175,15 +175,17 @@ editor_update :: () {
 }
 
 editor_handle_keyboard_event :: (event: *SDL_Event) {
-    if event.key.keysym.scancode == SDL_SCANCODE_DELETE {
-        for selected_entities remove_entity(it);
-        selected_entities.count = 0;
-    } else if event.key.keysym.scancode == SDL_SCANCODE_F11 {
-        editor_save_level();
-        start_game();
-    } else if event.key.keysym.scancode == SDL_SCANCODE_F {
-        if selected_entities.count == 1 {
-            set_camera_position(selected_entities[0].position);
+    if event.type == SDL_KEYUP {
+        if event.key.keysym.scancode == SDL_SCANCODE_DELETE {
+            for selected_entities remove_entity(it);
+            selected_entities.count = 0;
+        } else if event.key.keysym.scancode == SDL_SCANCODE_F11 {
+            editor_save_level();
+            start_game();
+        } else if event.key.keysym.scancode == SDL_SCANCODE_F {
+            if selected_entities.count == 1 {
+                set_camera_position(selected_entities[0].position);
+            }
         }
     }
 }

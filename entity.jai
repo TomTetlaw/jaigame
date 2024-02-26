@@ -24,7 +24,8 @@ Entity :: struct {
     size := Vec2.{ -1, -1 };
     colour := Colour.{ 1, 1, 1, 1 };
     texture: *Texture;
-    
+    depth: int;
+        
     velocity: Vec2;
     goal_velocity: Vec2;
     approach_speed := 100.0;
@@ -101,7 +102,7 @@ render_all_entities :: () {
         texture := it.texture;
         colour := it.colour;
         
-        if texture draw_texture(texture, position, colour, size);
+        if texture draw_texture(texture, position, colour, size, it.depth);
         else draw_quad(position, size, colour);
     }
 }

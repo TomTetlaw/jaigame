@@ -9,7 +9,6 @@ get_shader_location :: (shader: *Shader, name: string) -> s32 {
     hash_index := get_hash(name) % 1024;
     index := shader.hash_map[hash_index];
     loc := shader.uniforms[index];
-    log_vars(hash_index);
     return loc;
 }
 
