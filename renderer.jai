@@ -46,7 +46,7 @@ renderer_init :: (screen_size: Vec2) {
     set_camera_position(v2(0,0));
 }
 
-draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}, depth := 0) {
+draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}, depth := 0, tex_coords: [4] Vec2 = .[.{0,0}, .{0,1}, .{1,0}, .{1,1}]) {
     size := custom_size;
     if custom_size.x == -1 || custom_size.y == -1 {
         size = .{ xx texture.width, xx texture.height };

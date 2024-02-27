@@ -12,20 +12,41 @@ Entity_Class :: #type,distinct s32;
 Entity_Flags :: enum_flags u32 {
     Physics;
     CustomRender;
+    Animation;
+}
+
+Animation_Mode :: enum {
+    Once;
+    Repeating;
+}
+
+Animation_Player :: struct {
+    num_frames_x: int;
+    num_frames_y: int;
+    frame_size: Vec2;
+    fps: float;
+    last_switch_time: float;            @no_imgui
+    tex_coords: [4] Vec2;               @no_imgui
+    texture: *Texture;
+    mode: Animation_Mode;
+    current_frame: int;                 @no_imgui
 }
 
 Entity :: struct {
     id: int;                            @no_imgui @no_serialize
     locator: Bucket_Locator;            @no_imgui @no_serialize
     class: Entity_Class;                @no_imgui @no_serialize
-    flags: Entity_Flags = .Physics;     @no_imgui
+    flags: Entity_Flags = .Physics;
     
     position: Vec2;
     size := Vec2.{ -1, -1 };
     colour := Colour.{ 1, 1, 1, 1 };
     texture: *Texture;
     depth: int;
-        
+       
+    // todo: serialize this
+    animation: *Animation_Player;       @no_imgui @no_serialize
+       
     velocity: Vec2;
     goal_velocity: Vec2;
     approach_speed := 100.0;
@@ -93,6 +114,38 @@ create_entity :: ($T: Type, id: int = -1) -> *T {
     return entity;
 }
 
+start_animation :: (entity: *Entity, using animation: *Animation_Player) {
+    entity.animation = animation;
+    animation.last_switch_time = game_time;
+}
+
+stop_animation :: (entity: *Entity) {
+    entity.animation = null;
+}
+
+update_animation :: (entity: *Entity, using animation: *Animation_Player) {
+    if !animation return;
+    if !texture return;
+    
+    num_frames := num_frames_x * num_frames_y;
+    
+    if game_time > last_switch_time + (1.0 / fps) {
+        last_switch_time = game_time;
+        current_frame = (current_frame + 1) % num_frames;
+        frame_x := (current_frame % num_frames_x) * frame_size.x;
+        frame_y := (current_frame / num_frames_x) * frame_size.y;
+        
+        tex_coords[0] = .{frame_x / texture.width, frame_y / texture.height};
+        tex_coords[1] = .{frame_x / texture.width + frame_size.x, frame_y / texture.height};
+        tex_coords[2] = .{frame_x / texture.width, frame_y / texture.height + frame_size.y};
+        tex_coords[3] = .{frame_x / texture.width + frame_size.x, frame_y / texture.height + frame_size.y};
+        
+        if mode == .Once && current_frame >= num_frames {
+            stop_animation(entity);
+        }
+    }
+}
+
 render_all_entities :: () {
     for entity_list.active_entities {
         if it.flags & .CustomRender continue;
@@ -101,9 +154,14 @@ render_all_entities :: () {
         size := get_entity_size(it);
         texture := it.texture;
         colour := it.colour;
-        
-        if texture draw_texture(texture, position, colour, size, it.depth);
-        else draw_quad(position, size, colour);
+
+        if it.flags & .Animation && it.texture {
+            update_animation(it, it.animation);
+            draw_texture(texture, position, colour, size, it.depth, it.animation.tex_coords);
+        } else {        
+            if texture draw_texture(texture, position, colour, size, it.depth);
+            else draw_quad(position, size, colour);
+        }
     }
 }
 
@@ -184,7 +242,16 @@ serialize :: (builder: *String_Builder, name: string, array: *[..] $T) {
         serialize(builder, tprint("%[%]", name, it_index), it);
     }
 }
-serialize :: (builder: *String_Builder, name: string, value: *Entity_Flags) {
+serialize :: (builder: *String_Builder, name: string, array: *[$N] $T) {
+    for * <<array {
+        serialize(builder, tprint("%[%]", name, it_index), it);
+    }
+}
+serialize :: (builder: *String_Builder, name: string, value: *$T) #modify {
+    s := cast(*Type_Info) T;
+    return s.type == .ENUM;
+}
+{
     append(builder, tprint("% = %\n", name, cast(int) (<<value)));
 }
 
@@ -263,10 +330,11 @@ deserialize :: (values: *Table(string, string), version: int, name: string, arra
         }
     } else log("couldn't deserialize field %.count (not found)", name);
 }
-deserialize :: (values: *Table(string, string), version: int, name: string, value: *Entity_Flags) {
-    v := table_find_pointer(values, name);
-    if v then <<value = cast(Entity_Flags) parse_int(v);
-    else log("couldn't deserialize field % (not found)", name);
+
+deserialize :: (values: *Table(string, string), version: int, name: string, array: *[$N] $T) {
+    for 0..N-1 {
+        deserialize(values, version, tprint("%[%]", name, it), *array.data[it]);
+    }
 }
 
 deserialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
@@ -300,6 +368,16 @@ deserialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
     
     out := builder_to_string(*builder);
     return out;
+}
+
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *$T) #modify {
+    s := cast(*Type_Info) T;
+    return s.type == .ENUM;
+}
+{
+    v := table_find_pointer(values, name);
+    if v then <<value = cast(T) parse_int(v);
+    else log("couldn't deserialize field % (not found)", name);
 }
 
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *$T) #modify {

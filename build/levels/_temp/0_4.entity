@@ -1,9 +1,0 @@
-1
-e.base.position = -202,100
-e.base.size = -1,-1
-e.base.colour = 1,1,1,1
-e.base.texture = textures/player.png
-e.base.velocity = 0,0
-e.base.goal_velocity = 0,0
-e.base.approach_speed = 1000
-e.move_speed = 300

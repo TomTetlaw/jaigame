@@ -335,7 +335,9 @@ do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> strin
         
         if it.type.type == .STRUCT && not_easy_struct(it.type) {
             prefix := tprint("%0%.", member_prefix, it.name);
+            append(*builder, tprint("if ImGui.CollapsingHeader(\"%\") {", it.name));
             append(*builder, do_custom_imgui_helper(it.type, prefix));
+            append(*builder, "}");
         } else {
             append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
         }
@@ -343,6 +345,57 @@ do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> strin
     
     out := builder_to_string(*builder);
     return out;
+}
+
+do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
+    s := cast(*Type_Info) T;
+    if s.type != .ENUM return false;
+    e := cast(*Type_Info_Enum) s;
+    return e.enum_type_flags & .FLAGS == 0;
+}
+{
+    names := enum_names(T);
+    dest := cast(s32) <<value;
+    
+    items := tarray(*u8);
+    for names array_add(*items, it.data);
+    
+    if ImGui.Combo(name.data, *dest, items.data, xx items.count) {
+        <<value = cast(T) dest;
+        return true;
+    }
+    
+    return false;
+}
+
+do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
+    s := cast(*Type_Info) T;
+    if s.type != .ENUM return false;
+    e := cast(*Type_Info_Enum) s;
+    return e.enum_type_flags & .FLAGS != 0;
+}
+{
+    names := enum_names(T);
+    dest := cast(s32) <<value;
+    
+    items := tarray(*u8);
+    for names array_add(*items, it.data);
+
+    if ImGui.CollapsingHeader(name.data) {
+        ImGui.Indent();
+        
+        f_value := 0;
+        for names {
+            b_value := (<<value & cast(T) (1 << it_index)) != 0;
+            ImGui.Checkbox(names[it_index].data, *b_value);
+            if b_value f_value |= (1 << it_index);
+        }
+        <<value = cast(T) f_value;
+        
+        ImGui.Unindent();
+    }    
+    
+    return false;
 }
 
 do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
@@ -357,6 +410,7 @@ do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
     info := cast(*Type_Info_Struct) T;
     if ImGui.CollapsingHeader(name.data) {
         ImGui.Indent();
+        ImGui.Text("Hello");
         #insert #run do_custom_imgui_helper(type_info(T));
         ImGui.Unindent();
     }

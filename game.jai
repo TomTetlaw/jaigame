@@ -5,6 +5,8 @@ Player :: struct {
     
     base.approach_speed = 1000;   
     move_speed := 300.0;
+    
+    walk_animation: Animation_Player;
 }
 
 Parallax_Layer :: struct {
@@ -26,8 +28,7 @@ Parallax_Background :: struct {
     layers: [..] Parallax_Layer;
 }
 
-delta_time: float; // game code uses float32 so use this to avoid having to cast
-delta_time_64, real_time, game_time, old_time: float64;
+delta_time, real_time, game_time, old_time: float;
 game_paused: bool;
 
 default_texture_for_entity :: (class: Entity_Class) -> *Texture {
@@ -93,17 +94,15 @@ update_game :: () {
     old_time = real_time;
     
     now := current_time_monotonic();
-    real_time = to_float64_seconds(now);
+    real_time = cast(float) to_float64_seconds(now);
     
     if !game_paused {
-        delta_time_64 = real_time - old_time;
+        delta_time = real_time - old_time;
         game_time += delta_time;
     } else {
-        delta_time_64 = 0.0;
+        delta_time = 0.0;
     }
     
-    delta_time = cast(float) delta_time_64;
-
     update_entity_physics();
 
     update_parallax_backgrounds();
