@@ -13,23 +13,23 @@ renderer_init :: (screen_size: Vec2) {
     render_half_size = screen_size * 0.5;
     camera_focus_point = render_half_size;
     
-    verts: [4] Vertex;
-    verts[0].position = v3(-0.5, 0.5, 0);
-    verts[0].tex_coord = v2(0, 0);
+    positions: [4] Vec3;
+    positions[0] = v3(-0.5, 0.5, 0);
+    positions[1] = v3(-0.5, -0.5, 0);
+    positions[2] = v3(0.5, 0.5, 0);
+    positions[3] = v3(0.5, -0.5, 0);
     
-    verts[1].position = v3(-0.5, -0.5, 0);
-    verts[1].tex_coord = v2(0, 1);
-    
-    verts[2].position = v3(0.5, 0.5, 0);
-    verts[2].tex_coord = v2(1, 0);
-    
-    verts[3].position = v3(0.5, -0.5, 0);
-    verts[3].tex_coord = v2(1, 1);
+    tex_coords: [4] Vec2;
+    tex_coords[0] = v2(0, 0);
+    tex_coords[1] = v2(0, 1);
+    tex_coords[2] = v2(1, 0);
+    tex_coords[3] = v2(1, 1);
     
     glGenVertexArrays(1, *vertex_array);
     glBindVertexArray(vertex_array);
     
-    vertex_buffer = create_buffer(GL_ARRAY_BUFFER, size_of(Vertex) * 4, verts.data);
+    position_buffer = create_buffer(GL_ARRAY_BUFFER, size_of(Vec3) * 4, positions.data);
+    tex_coord_buffer = create_buffer(GL_ARRAY_BUFFER, size_of(Vec2) * 4, tex_coords.data);
     
     indices := u32.[ 0, 1, 2, 1, 3, 2 ];
     index_buffer = create_buffer(GL_ELEMENT_ARRAY_BUFFER, size_of(u32) * 6, indices.data);
@@ -37,11 +37,13 @@ renderer_init :: (screen_size: Vec2) {
     basic_shader = make_shader_program(basic_shader_text);
     coloured_shader = make_shader_program(coloured_shader_text);
     
-    offset: *Vertex: null;
+    glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, size_of(Vertex), xx 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, size_of(Vec3), xx 0);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, tex_coord_buffer);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Vertex), xx size_of(Vec3));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, size_of(Vec2), xx 0);
     
     set_camera_position(v2(0,0));
 }
@@ -54,7 +56,7 @@ draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1
     
     basic: Draw_Command;
     basic.type = .Basic;
-    basic.basic = .{position, size, colour, texture.object};
+    basic.basic = .{position, size, colour, texture.object, tex_coords};
     basic.depth = depth;
     add_render_command(basic);
 }
@@ -115,6 +117,8 @@ renderer_do_commands :: () {
     
     for basic_commands {
         prepare_basic_shader(*it.basic);
+        glBindBuffer(GL_ARRAY_BUFFER, tex_coord_buffer);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, size_of(Vec2) * 4, it.basic.tex_coords.data);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, null);
     }
     
@@ -145,6 +149,7 @@ Basic_Command :: struct {
     size: Vec2;
     colour: Vec4;
     texture: u32;
+    tex_coords: [4] Vec2;
 }
 
 Coloured_Command :: struct {
@@ -170,12 +175,8 @@ add_render_command :: (command: Draw_Command) {
     array_add(*render_commands, command);
 }
 
-Vertex :: struct {
-    position: Vec3;
-    tex_coord: Vec2;
-}
-
-vertex_buffer: u32;
+position_buffer: u32;
+tex_coord_buffer: u32;
 index_buffer: u32;
 vertex_array: u32;
 

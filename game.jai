@@ -70,6 +70,7 @@ start_game :: () {
     }
     
     player = *players[0];
+    start_animation(player, *player.walk_animation);
 }
 
 render_parallax_backgrounds :: () {
@@ -109,8 +110,12 @@ update_game :: () {
     
     if !player return;
     player.goal_velocity = v2(0, 0);
-    if player_move[0] player.goal_velocity.x = -player.move_speed;
-    if player_move[1] player.goal_velocity.x = player.move_speed;
+    if player_move[0] {
+        player.goal_velocity.x = -player.move_speed;
+    }
+    if player_move[1] {
+        player.goal_velocity.x = player.move_speed;
+    }
     
     set_camera_position(player.position);
 }

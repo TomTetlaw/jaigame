@@ -21,8 +21,7 @@ Animation_Mode :: enum {
 }
 
 Animation_Player :: struct {
-    num_frames_x: int;
-    num_frames_y: int;
+    num_frames: int;
     frame_size: Vec2;
     fps: float;
     last_switch_time: float;            @no_imgui
@@ -116,7 +115,13 @@ create_entity :: ($T: Type, id: int = -1) -> *T {
 
 start_animation :: (entity: *Entity, using animation: *Animation_Player) {
     entity.animation = animation;
-    animation.last_switch_time = game_time;
+    last_switch_time = game_time;
+    
+    // set the tex coords for the first frame
+    tex_coords[0] = .{0, 0};
+    tex_coords[1] = .{0, 1};
+    tex_coords[2] = .{frame_size.x / texture.width, 0};
+    tex_coords[3] = .{frame_size.x / texture.width, 1};
 }
 
 stop_animation :: (entity: *Entity) {
@@ -127,18 +132,17 @@ update_animation :: (entity: *Entity, using animation: *Animation_Player) {
     if !animation return;
     if !texture return;
     
-    num_frames := num_frames_x * num_frames_y;
-    
     if game_time > last_switch_time + (1.0 / fps) {
         last_switch_time = game_time;
         current_frame = (current_frame + 1) % num_frames;
-        frame_x := (current_frame % num_frames_x) * frame_size.x;
-        frame_y := (current_frame / num_frames_x) * frame_size.y;
+        frame_x := (current_frame % num_frames) * frame_size.x;
         
-        tex_coords[0] = .{frame_x / texture.width, frame_y / texture.height};
-        tex_coords[1] = .{frame_x / texture.width + frame_size.x, frame_y / texture.height};
-        tex_coords[2] = .{frame_x / texture.width, frame_y / texture.height + frame_size.y};
-        tex_coords[3] = .{frame_x / texture.width + frame_size.x, frame_y / texture.height + frame_size.y};
+        tex_coords[0] = .{frame_x / texture.width,                0};
+        tex_coords[1] = .{frame_x / texture.width,                1};
+        tex_coords[2] = .{(frame_x + frame_size.x) / texture.width, 0};
+        tex_coords[3] = .{(frame_x + frame_size.x) / texture.width, 1};
+        
+        print_vars(tex_coords);
         
         if mode == .Once && current_frame >= num_frames {
             stop_animation(entity);
@@ -155,9 +159,9 @@ render_all_entities :: () {
         texture := it.texture;
         colour := it.colour;
 
-        if it.flags & .Animation && it.texture {
+        if (it.flags & .Animation) && it.animation {
             update_animation(it, it.animation);
-            draw_texture(texture, position, colour, size, it.depth, it.animation.tex_coords);
+            draw_texture(it.animation.texture, position, colour, size, it.depth, it.animation.tex_coords);
         } else {        
             if texture draw_texture(texture, position, colour, size, it.depth);
             else draw_quad(position, size, colour);
