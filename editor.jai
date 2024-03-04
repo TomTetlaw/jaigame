@@ -179,6 +179,7 @@ editor_handle_keyboard_event :: (event: *SDL_Event) {
         if event.key.keysym.scancode == SDL_SCANCODE_DELETE {
             for selected_entities remove_entity(it);
             selected_entities.count = 0;
+            editor_unsaved_changes = true;
         } else if event.key.keysym.scancode == SDL_SCANCODE_F11 {
             editor_save_level();
             start_game();
@@ -304,6 +305,17 @@ do_custom_imgui :: (name: string, value: *bool) -> bool { return ImGui.Checkbox(
 do_custom_imgui :: (name: string, value: *Vec2) -> bool { return ImGui.DragFloat2(name.data, *value.component); }
 do_custom_imgui :: (name: string, value: *Vec4) -> bool { return ImGui.DragFloat4(name.data, *value.component); }
 
+do_custom_imgui :: (name: string, value: *string) -> bool {
+    buffer: [1024] u8;
+    memcpy(buffer.data, value.data, value.count);
+    changes := ImGui.InputText(name.data, buffer.data, 1024);
+    if changes {
+        <<value = copy_string(cast(string) buffer);
+        value.count = c_style_strlen(buffer.data);
+    }
+    return changes;
+}
+
 do_custom_imgui :: (name: string, value: *Colour) -> bool {
     colour_v4 := cast(Vec4) <<value;
     changes := ImGui.ColorEdit4(name.data, *colour_v4.component); 
@@ -400,7 +412,9 @@ do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> strin
         if it.type.type == .STRUCT && not_easy_struct(it.type) {
             prefix := tprint("%0%.", member_prefix, it.name);
             append(*builder, tprint("if ImGui.CollapsingHeader(\"%\") {", it.name));
+            append(*builder, "ImGui.Indent();\n");
             append(*builder, do_custom_imgui_helper(it.type, prefix));
+            append(*builder, "ImGui.Unindent();\n");
             append(*builder, "}");
         } else {
             append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
@@ -469,7 +483,10 @@ Axis :: struct {
 x_axis, y_axis: Axis;
 
 find_entity_under_point :: (point: Vec2) -> *Entity {
-    for entity_list.active_entities {
+    sorted_entities := tarray(entity_list.active_entities);
+    quick_sort(sorted_entities, (a, b) => a.depth - b.depth);
+    
+    for sorted_entities {
         if point_inside_rect(point, it.position, get_entity_size(it)) return it;
     }
     return null;

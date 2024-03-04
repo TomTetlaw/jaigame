@@ -39,30 +39,33 @@ main :: () {
         exit = process_window_events();
         if exit break;
         
-        if editor_open editor_update();
-        if !game_paused update_game();
-        
-        if editor_open {
-            ImGui_ImplSdl_NewFrame(window);
-            ImGui.NewFrame();
+        ImGui_ImplSdl_NewFrame(window);
+        ImGui.NewFrame();
             
+        if editor_open {
+            editor_update();
             editor_do_imgui();
+        }
+        
+        if !game_paused {
+            update_entity_physics();
+            update_game();
         }
         
         render_all_entities();
         if editor_open render_editor();
         render_game();
+        
+        if !game_paused game_do_imgui();
 
         renderer_do_commands();
 
-        if editor_open {
-            ImGui.Render();
-            ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
-        }
+        ImGui.Render();
+        ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
         
         SDL_GL_SwapWindow(window);
         
-        __Tracy.FrameMark();
+        #if DO_PROFILING __Tracy.FrameMark();
     }
 }
 

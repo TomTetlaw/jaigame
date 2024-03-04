@@ -3,6 +3,7 @@ Player :: struct {
     using #as base: Entity;
     VERSION :: 1;
     
+    base.flags = .Physics | .Animation;
     base.approach_speed = 1000;   
     move_speed := 300.0;
     
@@ -17,13 +18,6 @@ Parallax_Layer :: struct {
     depth := 0;
     colour: Colour = .{1, 1, 1, 1};
     lag_amount: float;
-} 
-
-Level_Options :: struct {
-    using #as base: Entity;
-    VERSION :: 1;
-    
-    camera_focus: Vec2;
 }
 
 Parallax_Background :: struct {
@@ -35,7 +29,15 @@ Parallax_Background :: struct {
     layers: [..] Parallax_Layer;
 }
 
-delta_time, real_time, game_time, old_time: float;
+Marker :: struct {
+    using #as base: Entity;
+    VERSION :: 1;
+    
+    name: string;
+}
+
+delta_time, real_time, game_time: float;
+real_time_s128, old_time_s128, delta_time_s128: Apollo_Time;
 game_paused: bool;
 
 default_texture_for_entity :: (class: Entity_Class) -> *Texture {
@@ -58,7 +60,6 @@ game_handle_keyboard_event :: (event: *SDL_Event) {
         }
     }
 
-    if !player return;    
     if event.key.keysym.scancode == SDL_SCANCODE_A {
         player_move[0] = event.type == SDL_KEYDOWN;
     } else if event.key.keysym.scancode == SDL_SCANCODE_D {
@@ -66,21 +67,43 @@ game_handle_keyboard_event :: (event: *SDL_Event) {
     }
 }
 
+find_marker :: (name: string) -> (Vec2, bool) {
+    for * entity_list._Marker if it.name == name return it.position, true;
+    return .{0, 0}, false;
+}
+
 start_game :: () {
     editor_open = false;
     game_paused = false;
     
-    if entity_list._Level_Options.count > 0 level_options = *entity_list._Level_Options[0];
-    camera_focus_point = level_options.camera_focus;
+    game_time = 0.0;
+    
+    // so that the first frame DT isn't huge
+    now := current_time_monotonic();
+    old_time_s128 = now;
+    real_time_s128 = now;
+    
+    focus_marker, found := find_marker("camera_focus");
+    if found camera_focus_point = focus_marker;
     
     players := entity_list._Player;
     if players.count != 1 {
-        log("There needs to be exactly one player in the level");
+        fatal_error("There needs to be exactly one player in the level");
         return;
     }
     
     player = *players[0];
     start_animation(player, *player.walk_animation);
+}
+
+game_do_imgui :: () {
+    ImGui.Begin("Game State");
+    
+    ImGui.Text(tprint("real_time: %", real_time));
+    ImGui.Text(tprint("game_time: %", game_time));
+    ImGui.Text(tprint("delta_time: %", delta_time));
+    
+    ImGui.End();
 }
 
 render_parallax_backgrounds :: () {
@@ -102,23 +125,21 @@ update_parallax_backgrounds :: () {
 }
 
 update_game :: () {
-    old_time = real_time;
+    old_time_s128 = real_time_s128;
+    real_time_s128 = current_time_monotonic();
+    delta_time_s128 = real_time_s128 - old_time_s128;
     
-    now := current_time_monotonic();
-    real_time = cast(float) to_float64_seconds(now);
+    real_time = cast(float) to_float64_seconds(real_time_s128);
     
     if !game_paused {
-        delta_time = real_time - old_time;
-        game_time += delta_time;
+        delta_time = cast(float) to_float64_seconds(delta_time_s128);
+        game_time = game_time + delta_time;
     } else {
         delta_time = 0.0;
     }
-    
-    update_entity_physics();
 
     update_parallax_backgrounds();
     
-    if !player return;
     player.goal_velocity = v2(0, 0);
     if player_move[0] {
         player.goal_velocity.x = -player.move_speed;
@@ -136,5 +157,4 @@ render_game :: () {
 
 #scope_file
 
-level_options: *Level_Options;
 player: *Player;

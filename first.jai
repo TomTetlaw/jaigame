@@ -24,7 +24,7 @@ prepare_build_options :: (mode: Target_Mode, options: *Build_Options) {
 
 iprof: *Metaprogram_Plugin;
 
-do_build :: (mode: Target_Mode, options: *Build_Options) {
+do_build :: (mode: Target_Mode, do_profile: bool, options: *Build_Options) {
     workspace := compiler_create_workspace("Final workspace");
     if !workspace {
         print("Workspace creation failed!\n");
@@ -34,15 +34,22 @@ do_build :: (mode: Target_Mode, options: *Build_Options) {
     prepare_build_options(mode, options);
     set_build_options(options, workspace);
     
-    iprof_flags: Intercept_Flags;
-	iprof = Iprof.get_plugin();
-	iprof.workspace = workspace;
-	defer Iprof.finish(iprof);
-	Iprof.before_intercept(iprof, *iprof_flags);
+    if do_profile {
+        iprof_flags: Intercept_Flags;
+	    iprof = Iprof.get_plugin();
+	    iprof.workspace = workspace;
+	    defer Iprof.finish(iprof);
+	    Iprof.before_intercept(iprof, *iprof_flags);
+	}
     
     compiler_begin_intercept(workspace);
     
-    Iprof.add_source(iprof);
+    if do_profile {
+        Iprof.add_source(iprof);
+        add_build_string("DO_PROFILING :: 1;\n", workspace);
+    } else {
+        add_build_string("DO_PROFILING :: 0;\n", workspace);
+    }
     
     if mode == .Debug {
         add_build_string("DEBUG_BUILD :: 1;\n", workspace);
@@ -105,21 +112,23 @@ do_build :: (mode: Target_Mode, options: *Build_Options) {
     
     print("Files in build: %\n", files_in_build);
     
-    message_loop(workspace);
+    message_loop(workspace, do_profile);
     
     compiler_end_intercept(workspace);
     
     set_build_options_dc(.{ do_output = false, write_added_strings = false });
 }
 
-message_loop :: (workspace: Workspace) {
+message_loop :: (workspace: Workspace, do_profile: bool) {
     codegen: Codegen;
     
     while true {
         message := compiler_wait_for_message();
         if !message break;
         
-        Iprof.message(iprof, message);
+        if do_profile {
+            Iprof.message(iprof, message);
+        }
         
         if message.kind == {
             case .TYPECHECKED;
@@ -280,6 +289,8 @@ build :: () {
     options := get_build_options();
     args := options.compile_time_command_line;
     
+    do_profile := false;
+    
     mode: Target_Mode = .Debug;
     for args {
         if it == {
@@ -287,10 +298,12 @@ build :: () {
             mode = .Debug;
             case "release";
             mode = .Release;
+            case "profile";
+            do_profile = true;
         }
     }
     
-    do_build(mode, *options);
+    do_build(mode, do_profile, *options);
 }
 
 #run build();

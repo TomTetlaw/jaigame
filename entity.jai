@@ -27,7 +27,7 @@ Animation_Player :: struct {
     last_switch_time: float;            @no_imgui
     tex_coords: [4] Vec2;               @no_imgui
     texture: *Texture;
-    mode: Animation_Mode;
+    mode: Animation_Mode = .Repeating;
     current_frame: int;                 @no_imgui
 }
 
@@ -230,6 +230,9 @@ serialize :: (builder: *String_Builder, name: string, value: *Vec2) {
 serialize :: (builder: *String_Builder, name: string, value: *Vec4) {
     append(builder, tprint("% = %,%,%,%\n", name, value.x, value.y, value.z, value.w));
 }
+serialize :: (builder: *String_Builder, name: string, value: *string) {
+    append(builder, tprint("% = %\n", name, <<value));
+}
 serialize :: (builder: *String_Builder, name: string, value: *Colour) {
     vec := <<value;
     append(builder, tprint("% = %,%,%,%\n", name, vec.x, vec.y, vec.z, vec.w));
@@ -309,6 +312,11 @@ deserialize :: (values: *Table(string, string), version: int, name: string, valu
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec4) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_vec4(<<v);
+    else log("couldn't deserialize field % (not found)", name);
+}
+deserialize :: (values: *Table(string, string), version: int, name: string, value: *string) {
+    v := table_find_pointer(values, name);
+    if v then <<value = <<v;
     else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Colour) {
