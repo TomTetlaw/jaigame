@@ -90,7 +90,7 @@ entity_cast :: (entity: *Entity, $T: Type) -> *T {
     return cast(*T) entity;
 }
 
-create_entity :: ($T: Type, id: int = -1) -> *T {
+create_entity :: ($T: Type, id := -1) -> *T {
     array := array_for_entity(T);
     
     dummy: T;
@@ -114,6 +114,8 @@ create_entity :: ($T: Type, id: int = -1) -> *T {
 }
 
 start_animation :: (entity: *Entity, using animation: *Animation_Player) {
+    if !animation.texture return;
+    
     entity.animation = animation;
     last_switch_time = game_time;
     
@@ -141,8 +143,6 @@ update_animation :: (entity: *Entity, using animation: *Animation_Player) {
         tex_coords[1] = .{frame_x / texture.width,                1};
         tex_coords[2] = .{(frame_x + frame_size.x) / texture.width, 0};
         tex_coords[3] = .{(frame_x + frame_size.x) / texture.width, 1};
-        
-        print_vars(tex_coords);
         
         if mode == .Once && current_frame >= num_frames {
             stop_animation(entity);
@@ -178,7 +178,7 @@ save_level :: (level_name: string) {
     for files file_delete(it);
     
     for entity_list.active_entities {
-        file_name := tprint("levels/%/%_%.entity", path, it.id, it.class);
+        file_name := tprint("levels/%/%.entity", path, it.id);
         string_to_write := serialize_entity(it);
         write_entire_file(file_name, string_to_write);
     }
@@ -191,18 +191,16 @@ load_level :: (level_name: string) {
     if equal(level_name, "") path = "_temp";
     files := file_list(tprint("levels/%", path));
     for files {
-        id, class: int;
-        success0 := scan2(it, tprint("levels/%/%%_%%.entity", path), *id, *class);
-        if !success0 continue;
-        
-        e := create_entity_from_save(cast(Entity_Class) class, id);
-        if !e continue;
-        
         success1, lines := file_to_array(it);
         if !success1 continue;
  
-        version := parse_int(*lines[0]);
-        array_advance(*lines);
+        class: string;
+        id, version: int;
+        scan2(lines[0], "[%, %, %]", *class, *version, *id);
+        advance(*lines);
+        
+        e := create_entity_by_type_name(class, id);
+        if !e continue;
         
         members: Table(string, string);       
         for line: lines {
@@ -291,37 +289,37 @@ serialize :: (builder: *String_Builder, name: string, value: *$T) #modify {
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *int) { 
     v := table_find_pointer(values, name);
     if v then <<value = parse_int(v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *float) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_float(v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *bool) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_bool(v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec2) { 
     v := table_find_pointer(values, name);
     if v then <<value = parse_vec2(<<v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Vec4) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_vec4(<<v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *Colour) {
     v := table_find_pointer(values, name);
     if v then <<value = parse_colour(<<v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: **Texture) {
     v := table_find_pointer(values, name);
     if v then <<value = texture_for_path(<<v);
-    else log("couldn't deserialize field %.count (not found)", name);
+    else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, array: *[..] $T) {
     v := table_find_pointer(values, tprint("%.count", name));

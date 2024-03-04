@@ -19,6 +19,13 @@ Parallax_Layer :: struct {
     lag_amount: float;
 } 
 
+Level_Options :: struct {
+    using #as base: Entity;
+    VERSION :: 1;
+    
+    camera_focus: Vec2;
+}
+
 Parallax_Background :: struct {
     using #as base: Entity;
     VERSION :: 1;
@@ -62,6 +69,9 @@ game_handle_keyboard_event :: (event: *SDL_Event) {
 start_game :: () {
     editor_open = false;
     game_paused = false;
+    
+    if entity_list._Level_Options.count > 0 level_options = *entity_list._Level_Options[0];
+    camera_focus_point = level_options.camera_focus;
     
     players := entity_list._Player;
     if players.count != 1 {
@@ -126,4 +136,5 @@ render_game :: () {
 
 #scope_file
 
+level_options: *Level_Options;
 player: *Player;

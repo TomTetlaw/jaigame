@@ -1,4 +1,4 @@
-1
+["Player", 1, 1]
 .value.base.flags = 5
 .value.base.position = 100,100
 .value.base.size = -1,-1

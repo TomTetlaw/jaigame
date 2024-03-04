@@ -25,15 +25,27 @@ bucket_array_get :: (using array: *Bucket_Array, locator: Bucket_Locator) -> *ar
     return *bucket.data[slot_index];
 }
 
-array_advance :: (array: * [..] $T) {
-    array.data += 1;
-    array.count -= 1;
+advance :: (array: * [..] $T, count := 1) {
+    array.data += count;
+    array.count -= count;
 }
 
 tarray :: ($T: Type) -> [..] T {
     array: [..] T;
     array.allocator = temp;
     return array;
+}
+
+tarray :: (array: [..] $T) -> [] T {
+    out: [] T;
+    
+    size := size_of(T) * array.count;
+    
+    out.count = array.count;
+    out.data = alloc(size);
+    memcpy(out.data, array.data, size);
+    
+    return out;
 }
 
 random_get_in_range :: (min: int, max: int) -> int {

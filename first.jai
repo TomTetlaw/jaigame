@@ -9,6 +9,8 @@ prepare_build_options :: (mode: Target_Mode, options: *Build_Options) {
     options.output_path = "build/";
     options.intermediate_path = "build/.build";
     
+    options.additional_linker_arguments = .["Advapi32.lib"];
+    
     options.backend = .LLVM;
     
     if mode == .Debug {
@@ -20,6 +22,8 @@ prepare_build_options :: (mode: Target_Mode, options: *Build_Options) {
     }
 }
 
+iprof: *Metaprogram_Plugin;
+
 do_build :: (mode: Target_Mode, options: *Build_Options) {
     workspace := compiler_create_workspace("Final workspace");
     if !workspace {
@@ -30,7 +34,15 @@ do_build :: (mode: Target_Mode, options: *Build_Options) {
     prepare_build_options(mode, options);
     set_build_options(options, workspace);
     
+    iprof_flags: Intercept_Flags;
+	iprof = Iprof.get_plugin();
+	iprof.workspace = workspace;
+	defer Iprof.finish(iprof);
+	Iprof.before_intercept(iprof, *iprof_flags);
+    
     compiler_begin_intercept(workspace);
+    
+    Iprof.add_source(iprof);
     
     if mode == .Debug {
         add_build_string("DEBUG_BUILD :: 1;\n", workspace);
@@ -107,6 +119,8 @@ message_loop :: (workspace: Workspace) {
         message := compiler_wait_for_message();
         if !message break;
         
+        Iprof.message(iprof, message);
+        
         if message.kind == {
             case .TYPECHECKED;
             typechecked := cast(*Message_Typechecked) message;
@@ -161,9 +175,9 @@ generate_code :: (codegen: *Codegen) -> string {
     }
     append(*builder, "];\n\n");
     
-    append(*builder, "create_entity_by_type_name :: (name: string) -> *Entity {\n");
+    append(*builder, "create_entity_by_type_name :: (name: string, id := -1) -> *Entity {\n");
     for codegen.entity_structs {
-        append(*builder, tprint("    if equal(name, \"%\") return create_entity(%);\n", it.name, it.name));
+        append(*builder, tprint("    if equal(name, \"%\") return create_entity(%, id);\n", it.name, it.name));
     }
     append(*builder, "    assert(false);\n");
     append(*builder, "    return null;\n");
@@ -227,8 +241,7 @@ generate_code :: (codegen: *Codegen) -> string {
     for codegen.entity_structs {
         append(*builder, tprint("if entity.class == _% {\n", it.name));
         append(*builder, tprint("e := entity_cast(entity, %);\n", it.name));
-        append(*builder, "v := e.VERSION;\n");
-        append(*builder, tprint("append(*builder, tprint(\"%%\\n\", v));\n"));
+        append(*builder, tprint("append(*builder, tprint(\"[\\\"%\\\", %%, %%]\\n\", e.VERSION, entity.id));\n", it.name));
         append(*builder, "serialize(*builder, \"\", e);\n");
         append(*builder, "}\n");
     }
@@ -268,7 +281,6 @@ build :: () {
     args := options.compile_time_command_line;
     
     mode: Target_Mode = .Debug;
-    
     for args {
         if it == {
             case "debug";
@@ -286,4 +298,7 @@ build :: () {
 #import "Basic";
 #import "Compiler";
 #import "File_Utilities";
-#import "String" ;
+#import "String";
+#import "Metaprogram_Plugins";
+//Iprof :: #import "Iprof";
+Iprof :: #import "jai-tracy";

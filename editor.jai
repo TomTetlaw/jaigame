@@ -261,6 +261,17 @@ texture_picker_size_index := 0;
 texture_imgui :: (name: string, texture: **Texture) {
     path := ifx <<texture then (<<texture).path else "none";
     if ImGui.Button(tprint("% (%) (Click to set texture)", name, path).data) texture_picker_target = texture;
+    
+    if !<<texture return;
+    if ImGui.IsItemHovered() {
+        ImGui.BeginTooltip();
+        
+        draw_list := ImGui.GetWindowDrawList();
+        draw_list.AddImage(draw_list, cast (ImGui.ImTextureID) (<<texture).object, 
+            ImGui.GetMousePos(), ImGui.GetMousePos() + .{128, 128});
+        
+        ImGui.EndTooltip();
+    }
 }
 
 do_texture_picker_imgui :: () -> *Texture {
@@ -323,30 +334,6 @@ do_custom_imgui :: (name: string, array: *[..] $T) -> bool {
     return changes;
 }
 
-do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
-    builder: String_Builder;
-    
-    s := cast(*Type_Info_Struct) info;
-    for s.members {
-        if find_note(it.notes, "no_imgui") continue;
-        
-        // :HACK for entities
-        if equal(it.name, "VERSION") continue;
-        
-        if it.type.type == .STRUCT && not_easy_struct(it.type) {
-            prefix := tprint("%0%.", member_prefix, it.name);
-            append(*builder, tprint("if ImGui.CollapsingHeader(\"%\") {", it.name));
-            append(*builder, do_custom_imgui_helper(it.type, prefix));
-            append(*builder, "}");
-        } else {
-            append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
-        }
-    }
-    
-    out := builder_to_string(*builder);
-    return out;
-}
-
 do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
     s := cast(*Type_Info) T;
     if s.type != .ENUM return false;
@@ -381,13 +368,15 @@ do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
     items := tarray(*u8);
     for names array_add(*items, it.data);
 
+    changes := false;
+
     if ImGui.CollapsingHeader(name.data) {
         ImGui.Indent();
         
         f_value := 0;
         for names {
             b_value := (<<value & cast(T) (1 << it_index)) != 0;
-            ImGui.Checkbox(names[it_index].data, *b_value);
+            changes |= ImGui.Checkbox(names[it_index].data, *b_value);
             if b_value f_value |= (1 << it_index);
         }
         <<value = cast(T) f_value;
@@ -395,7 +384,31 @@ do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
         ImGui.Unindent();
     }    
     
-    return false;
+    return changes;
+}
+
+do_custom_imgui_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
+    builder: String_Builder;
+    
+    s := cast(*Type_Info_Struct) info;
+    for s.members {
+        if find_note(it.notes, "no_imgui") continue;
+        
+        // :HACK for entities
+        if equal(it.name, "VERSION") continue;
+        
+        if it.type.type == .STRUCT && not_easy_struct(it.type) {
+            prefix := tprint("%0%.", member_prefix, it.name);
+            append(*builder, tprint("if ImGui.CollapsingHeader(\"%\") {", it.name));
+            append(*builder, do_custom_imgui_helper(it.type, prefix));
+            append(*builder, "}");
+        } else {
+            append(*builder, tprint("changes |= do_custom_imgui(\"%\", *%0%);\n", it.name, member_prefix, it.name));
+        }
+    }
+    
+    out := builder_to_string(*builder);
+    return out;
 }
 
 do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
@@ -410,7 +423,6 @@ do_custom_imgui :: (name: string, value: *$T) -> bool #modify {
     info := cast(*Type_Info_Struct) T;
     if ImGui.CollapsingHeader(name.data) {
         ImGui.Indent();
-        ImGui.Text("Hello");
         #insert #run do_custom_imgui_helper(type_info(T));
         ImGui.Unindent();
     }
