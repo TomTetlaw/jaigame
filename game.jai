@@ -29,6 +29,13 @@ Parallax_Background :: struct {
     layers: [..] Parallax_Layer;
 }
 
+Prop :: struct {
+    using #as base: Entity;
+    VERSION :: 1;
+    
+    base.flags = .Blocking;
+}
+
 Marker :: struct {
     using #as base: Entity;
     VERSION :: 1;
@@ -110,7 +117,30 @@ render_parallax_backgrounds :: () {
     for entity_list._Parallax_Background {
         for layer: it.layers {
             if !layer.texture continue;
-            draw_texture(layer.texture, layer.position, layer.colour, depth=layer.depth);
+            
+            if player {
+                player_pos := player.position;
+                player_relative_slot := truncate((player_pos.x-layer.position.x) / layer.texture.width);
+                
+                position0 := Vec2.{
+                    layer.position.x + (player_relative_slot - 1) * layer.texture.width, 
+                    layer.position.y
+                };
+                position1 := Vec2.{
+                    layer.position.x + (player_relative_slot) * layer.texture.width, 
+                    layer.position.y
+                };
+                position2 := Vec2.{
+                    layer.position.x + (player_relative_slot + 1) * layer.texture.width, 
+                    layer.position.y
+                };
+                
+                draw_texture(layer.texture, position0, layer.colour, depth=layer.depth);
+                draw_texture(layer.texture, position1, layer.colour, depth=layer.depth);
+                draw_texture(layer.texture, position2, layer.colour, depth=layer.depth);
+            } else {
+                draw_texture(layer.texture, layer.position, layer.colour, depth=layer.depth);
+            }
         }
     }
 }
@@ -119,7 +149,7 @@ update_parallax_backgrounds :: () {
     for entity_list._Parallax_Background {
         distance := player.position.x;
         for * layer: it.layers {
-            layer.position.x = distance * layer.lag_amount;
+           layer.position.x = distance * layer.lag_amount;
         }
     }
 }

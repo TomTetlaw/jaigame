@@ -11,6 +11,7 @@ Entity_Class :: #type,distinct s32;
 
 Entity_Flags :: enum_flags u32 {
     Physics;
+    Blocking;
     CustomRender;
     Animation;
 }

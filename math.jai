@@ -1,4 +1,8 @@
 
+truncate :: (value: float) -> int {
+    return cast(int) (value - frac(value));
+}
+
 Vec2 :: struct {
     x: float;
     y: float;
