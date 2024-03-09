@@ -2,12 +2,12 @@
 Entity_List :: struct {
     next_id: int;
     active_entities: [..] *Entity;
-#insert DERIVED_ENTITY_LISTS;
+    #insert DERIVED_ENTITY_LISTS;
 }
 
 entity_list: Entity_List;
 
-Entity_Class :: #type,distinct s32;
+Entity_Class :: #type,distinct int;
 
 Entity_Flags :: enum_flags u32 {
     Physics;
@@ -25,10 +25,10 @@ Animation_Player :: struct {
     num_frames: int;
     frame_size: Vec2;
     fps: float;
-    last_switch_time: float;            @no_imgui
-    tex_coords: [4] Vec2;               @no_imgui
     texture: *Texture;
     mode: Animation_Mode = .Repeating;
+    last_switch_time: float;            @no_imgui
+    tex_coords: [4] Vec2;               @no_imgui
     current_frame: int;                 @no_imgui
 }
 
@@ -43,10 +43,10 @@ Entity :: struct {
     colour := Colour.{ 1, 1, 1, 1 };
     texture: *Texture;
     depth: int;
-       
+    
     // todo: serialize this
     animation: *Animation_Player;       @no_imgui @no_serialize
-       
+        
     velocity: Vec2;
     goal_velocity: Vec2;
     approach_speed := 100.0;
@@ -96,7 +96,7 @@ create_entity :: ($T: Type, id := -1) -> *T {
     
     dummy: T;
     locator, entity := bucket_array_add(array, dummy);
-
+    
     if id >= 0 {
         entity.id = id;
         entity_list.next_id = id + 1;
@@ -140,11 +140,11 @@ update_animation :: (entity: *Entity, using animation: *Animation_Player) {
         current_frame = (current_frame + 1) % num_frames;
         frame_x := (current_frame % num_frames) * frame_size.x;
         
-        tex_coords[0] = .{frame_x / texture.width,                0};
-        tex_coords[1] = .{frame_x / texture.width,                1};
+        tex_coords[0] = .{frame_x / texture.width,                  0};
+        tex_coords[1] = .{frame_x / texture.width,                  1};
         tex_coords[2] = .{(frame_x + frame_size.x) / texture.width, 0};
         tex_coords[3] = .{(frame_x + frame_size.x) / texture.width, 1};
-        
+               
         if mode == .Once && current_frame >= num_frames {
             stop_animation(entity);
         }
@@ -159,7 +159,7 @@ render_all_entities :: () {
         size := get_entity_size(it);
         texture := it.texture;
         colour := it.colour;
-
+        
         if (it.flags & .Animation) && it.animation {
             update_animation(it, it.animation);
             draw_texture(it.animation.texture, position, colour, size, it.depth, it.animation.tex_coords);
@@ -194,7 +194,7 @@ load_level :: (level_name: string) {
     for files {
         success1, lines := file_to_array(it);
         if !success1 continue;
- 
+        
         class: string;
         id, version: int;
         scan2(lines[0], "[%, %, %]", *class, *version, *id);
@@ -287,7 +287,7 @@ serialize :: (builder: *String_Builder, name: string, value: *$T) #modify {
 }
 {
     info := cast(*Type_Info_Struct) T;
-    #insert #run serialize_helper(type_info(T));
+#insert #run serialize_helper(type_info(T));
 }
 
 deserialize :: (values: *Table(string, string), version: int, name: string, value: *int) { 
@@ -355,7 +355,7 @@ deserialize_helper :: (info: *Type_Info, member_prefix := "value.") -> string {
     for s.members {
         if find_note(it.notes, "no_serialize") continue;
         if equal(it.name, "VERSION") continue;
-
+        
         version_min := 1;
         version_max := 9999;
         for note: it.notes {
