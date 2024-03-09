@@ -1,0 +1,10 @@
+["Room_Face", 1, 3]
+.value.base.flags = 4
+.value.base.position = -373,-339
+.value.base.size = -1,-1
+.value.base.colour = 1,1,1,1
+.value.base.texture = textures/box.png
+.value.base.depth = 1
+.value.base.velocity = 0,0
+.value.base.goal_velocity = 0,0
+.value.base.approach_speed = 100

@@ -43,6 +43,13 @@ Marker :: struct {
     name: string;
 }
 
+Room_Face :: struct {
+    using #as base: Entity;
+    VERSION :: 1;
+    
+    base.flags = .CustomRender;
+}
+
 delta_time, real_time, game_time: float;
 real_time_s128, old_time_s128, delta_time_s128: Apollo_Time;
 game_paused: bool;
@@ -154,6 +161,21 @@ update_parallax_backgrounds :: () {
     }
 }
 
+render_room_faces :: () {
+    for * entity_list._Room_Face {
+        draw_texture(it.texture, it.position, it.colour, get_entity_size(it), it.depth);
+    }
+}
+
+update_room_faces :: () {
+    for * entity_list._Room_Face {
+        it.colour.w = 1.0;
+        if entity_aabb_check(player, it) {
+            it.colour.w = 0.0;
+        }
+    }
+}
+
 update_game :: () {
     old_time_s128 = real_time_s128;
     real_time_s128 = current_time_monotonic();
@@ -169,6 +191,7 @@ update_game :: () {
     }
 
     update_parallax_backgrounds();
+    update_room_faces();
     
     player.goal_velocity = v2(0, 0);
     if player_move[0] {
@@ -183,6 +206,7 @@ update_game :: () {
 
 render_game :: () {
     render_parallax_backgrounds();
+    render_room_faces();
 }
 
 #scope_file

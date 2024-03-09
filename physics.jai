@@ -18,7 +18,7 @@ update_entity_physics :: () {
                 if a.id == b.id continue;
                 if !(b.flags & .Blocking) continue;
                 
-                if entity_aabb_check(new_position, a, b) {
+                if entity_aabb_check_next_pos(new_position, a, b) {
                     a.velocity = .{0, 0};
                     hit_entity = b;
                     break;
@@ -39,7 +39,21 @@ update_entity_physics :: () {
     ImGui.End();
 }
 
-entity_aabb_check :: (new_pos: Vec2, a: *Entity, b: *Entity) -> bool {
+entity_aabb_check :: (a: *Entity, b: *Entity) -> bool {
+    a_pos := a.position;
+    a_size := get_entity_size(a);
+    b_pos := b.position;
+    b_size := get_entity_size(b);
+    
+    if a_pos.x+a_size.x*.5 < b_pos.x-b_size.x*.5 return false;
+    if a_pos.x-a_size.x*.5 > b_pos.x+b_size.x*.5 return false;
+    if a_pos.y+a_size.y*.5 < b_pos.y-b_size.y*.5 return false;
+    if a_pos.y-a_size.y*.5 > b_pos.y+b_size.y*.5 return false;
+    
+    return true;
+}
+
+entity_aabb_check_next_pos :: (new_pos: Vec2, a: *Entity, b: *Entity) -> bool {
     a_pos := new_pos;
     a_size := get_entity_size(a);
     b_pos := b.position;
