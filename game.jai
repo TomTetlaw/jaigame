@@ -47,9 +47,9 @@ delta_time, real_time, game_time: float;
 real_time_s128, old_time_s128, delta_time_s128: Apollo_Time;
 game_paused: bool;
 
-default_texture_for_entity :: (class: Entity_Class) -> *Texture {
-    if class == _Player return _texture_player;
-    return null;
+default_texture_for_entity :: (class: Entity_Class) -> string {
+    if class == _Player return "textures/player.png";
+    return "";
 }
 
 game_handle_mouse_event :: (event: *SDL_Event) {

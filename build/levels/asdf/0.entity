@@ -12,11 +12,11 @@
 .value.walk_animation.num_frames = 2
 .value.walk_animation.frame_size = 64,128
 .value.walk_animation.fps = 5
+.value.walk_animation.texture = textures/player_animation.png
+.value.walk_animation.mode = 1
 .value.walk_animation.last_switch_time = 0
 .value.walk_animation.tex_coords[0] = 0,0
 .value.walk_animation.tex_coords[1] = 0,0
 .value.walk_animation.tex_coords[2] = 0,0
 .value.walk_animation.tex_coords[3] = 0,0
-.value.walk_animation.texture = textures/player_animation.png
-.value.walk_animation.mode = 1
 .value.walk_animation.current_frame = 0

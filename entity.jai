@@ -58,10 +58,6 @@ get_entity_size :: (using entity: *Entity) -> Vec2 {
     return size;
 }
 
-entity_derived :: (default_texture: *Texture = null) #expand {
-    `default_texture :: default_texture;
-}
-
 Entity_Ref:: struct {
     locator: Bucket_Locator;
     class: Entity_Class;
@@ -107,7 +103,9 @@ create_entity :: ($T: Type, id := -1) -> *T {
     
     entity.locator = locator;
     entity.class = entity_class_for_type(T);
-    entity.texture = default_texture_for_entity(entity.class);
+    
+    texture_path := default_texture_for_entity(entity.class);
+    if !equal(texture_path, "") entity.texture = load_texture(texture_path);
     
     array_add(*entity_list.active_entities, entity);
     
@@ -327,7 +325,7 @@ deserialize :: (values: *Table(string, string), version: int, name: string, valu
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, value: **Texture) {
     v := table_find_pointer(values, name);
-    if v then <<value = texture_for_path(<<v);
+    if v then <<value = load_texture(<<v);
     else log("couldn't deserialize field % (not found)", name);
 }
 deserialize :: (values: *Table(string, string), version: int, name: string, array: *[..] $T) {

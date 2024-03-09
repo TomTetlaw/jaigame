@@ -4,8 +4,8 @@ editor_unsaved_changes: bool;
 current_level_name: string;
 
 editor_init :: () {
-    x_axis.texture = _texture_x_axis;
-    y_axis.texture = _texture_y_axis;
+    x_axis.texture = load_texture("textures/x_axis.png");
+    y_axis.texture = load_texture("textures/y_axis.png");
     x_axis.size = Vec2.{ xx x_axis.texture.width, xx x_axis.texture.height };
     y_axis.size = Vec2.{ xx y_axis.texture.width, xx y_axis.texture.height };
 }

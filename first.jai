@@ -78,35 +78,17 @@ do_build :: (mode: Target_Mode, do_profile: bool, options: *Build_Options) {
         builder: String_Builder;
         init_string_builder(*builder);
         
-        for files {
-            if ends_with(it, ".jpg") || ends_with(it, ".png") {
-                path, basename, extension, filename := path_decomp(it);
-                append(*builder, tprint("_texture_%: *Texture;\n", basename));
-            }
-        }
-        
         append(*builder, "_all_textures: [..] *Texture;\n");
         
         append(*builder, "load_all_textures :: () {\n");
         for files {
             if ends_with(it, ".jpg") || ends_with(it, ".png") {
                 path, basename, extension, filename := path_decomp(it);
-                append(*builder, tprint("_texture_% = load_texture(\"textures/%\");\n", basename, filename));
-                append(*builder, tprint("array_add(*_all_textures, _texture_%);\n", basename));
+                append(*builder, tprint("array_add(*_all_textures, load_texture(\"textures/%\"));\n", filename));
             }
         }
         append(*builder, "}\n"); 
      
-        append(*builder, "texture_for_path :: (path: string) -> *Texture {\n");
-        for files {
-            if ends_with(it, ".jpg") || ends_with(it, ".png") {
-                path, basename, extension, filename := path_decomp(it);
-                append(*builder, tprint("if equal(path, \"textures/%\") return _texture_%;\n", filename, basename));
-            }
-        }
-        append(*builder, "return null;\n");
-        append(*builder, "}\n\n");
-        
         add_build_string(builder_to_string(*builder), workspace);
     }
     
