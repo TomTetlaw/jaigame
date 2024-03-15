@@ -25,6 +25,8 @@ main :: () {
     ImGui_ImplSdl_Init(window);
     imgui_io = ImGui.GetIO();
     
+    my_font := load_font("fonts/consolas.ttf", 16);
+    
     exit := false;
     while true {
         exit = process_window_events();
@@ -32,6 +34,10 @@ main :: () {
         
         ImGui_ImplSdl_NewFrame(window);
         ImGui.NewFrame();
+        
+        draw_wireframe_quad(.{100, 100}, .{50, 50}, 3);
+        
+        draw_text(my_font, .{200, 200}, "Hello, world!");
         
         renderer_do_commands();
 

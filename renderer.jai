@@ -44,13 +44,7 @@ draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1
     }
     
     positions: [4] Vec3;
-    tex_coords: [4] Vec2;
     indices := u32.[0, 1, 2, 1, 3, 2];
-    
-    tex_coords[0] = .{0, 0};
-    tex_coords[1] = .{0, 1};
-    tex_coords[2] = .{1, 0};
-    tex_coords[3] = .{1, 1};
     
     positions[0] = .{position.x, position.y, 0};
     positions[1] = .{position.x, position.y + size.y, 0};
@@ -64,20 +58,15 @@ draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1
     basic.first_index = first_index;
     basic.first_vertex = first_vertex;
     basic.index_count = indices.count;
-    basic.basic = .{colour, texture.object, tex_coords};
+    basic.basic = .{colour, texture.object};
     basic.depth = depth;
     add_render_command(basic);
 }
 
-draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }) {
+draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{1, 1, 1, 1}, tex_coords: [4] Vec2 = .[.{0,0}, .{0,1}, .{1,0}, .{1,1}]) {
     positions: [4] Vec3;
     tex_coords: [4] Vec2;
     indices := u32.[0, 1, 2, 1, 3, 2];
-    
-    tex_coords[0] = .{0, 0};
-    tex_coords[1] = .{0, 1};
-    tex_coords[2] = .{1, 0};
-    tex_coords[3] = .{1, 1};
     
     positions[0] = .{position.x, position.y, 0};
     positions[1] = .{position.x, position.y + size.y, 0};
@@ -99,7 +88,14 @@ draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }) {
 draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1}, depth := 0, with_camera := false) {
     position := origin;
     
-    indices := u32.[0, 1, 2, 1, 3, 2];
+    positions: [..] Vec3;
+    positions.allocator = temp;
+    
+    tex_coords: [..] Vec2;
+    tex_coords.allocator = temp;
+    
+    indices: [..] u32;
+    indices.allocator = temp;
     
     for 0..text.count-1 {
         c := text.data[it];
@@ -108,139 +104,87 @@ draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1},
         quad: Stbtt.AlignedQuad;
         Stbtt.get_packed_quad(font.chars.data, xx font.texture.width, xx font.texture.height, c-32, *position.x, *position.y, *quad, 1);
         
-        tex_coords := Vec2.[
-            .{quad.s0, quad.t0},
-            .{quad.s0, quad.t1},
-            .{quad.s1, quad.t0},
-            .{quad.s1, quad.t1}
-        ];
-        
         quad.y0 += font.size;
         quad.y1 += font.size;
-        positions := Vec3.[.{quad.x0, quad.y0, 0}, .{quad.x0, quad.y1, 0}, .{quad.x1, quad.y0, 0}, .{quad.x1, quad.y1, 0}];
         
-        first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+        array_add(*positions, .{quad.x0, quad.y0, 0}); 
+        array_add(*positions, .{quad.x0, quad.y1, 0});
+        array_add(*positions, .{quad.x1, quad.y0, 0});
+        array_add(*positions, .{quad.x1, quad.y1, 0});
         
-        font_command: Draw_Command;
-        font_command.type = .Font;
-        font_command.first_index = first_index;
-        font_command.first_vertex = first_vertex;
-        font_command.index_count = indices.count;
-        font_command.font = .{colour, font.texture.object, tex_coords, with_camera};
-        font_command.depth = depth;
+        array_add(*tex_coords, .{quad.s0, quad.t0});
+        array_add(*tex_coords, .{quad.s0, quad.t1});
+        array_add(*tex_coords, .{quad.s1, quad.t0});
+        array_add(*tex_coords, .{quad.s1, quad.t1});
         
-        add_render_command(font_command);
+        quad_indices :: u32.[0, 1, 2, 1, 3, 2];
+        for i: 0..5 {
+            array_add(*indices, cast(u32) (it * 4) + quad_indices[i]);
+        }
     }
+    
+    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    
+    font_command: Draw_Command;
+    font_command.type = .Font;
+    font_command.first_index = first_index;
+    font_command.first_vertex = first_vertex;
+    font_command.index_count = indices.count;
+    font_command.font = .{colour, font.texture.object, with_camera};
+    font_command.depth = depth;
+    
+    add_render_command(font_command);
 }
 
 draw_wireframe_quad :: (position: Vec2, size: Vec2, thickness: float, colour: Vec4 = .{ 1, 1, 1, 1 }) {
-    // top
-    {
-        positions: [4] Vec3;
-        tex_coords: [4] Vec2;
-        indices := u32.[0, 1, 2, 1, 3, 2];
-        
-        tex_coords[0] = .{0, 0};
-        tex_coords[1] = .{0, 1};
-        tex_coords[2] = .{1, 0};
-        tex_coords[3] = .{1, 1};
-        
-        positions[0] = .{position.x, position.y, 0};
-        positions[1] = .{position.x, position.y + thickness, 0};
-        positions[2] = .{position.x + size.x, position.y, 0};
-        positions[3] = .{position.x + size.x, position.y + thickness, 0};
-    
-        first_index, first_vertex := write_buffers(indices, positions, tex_coords);
-        
-        coloured: Draw_Command;
-        coloured.type = .Coloured;
-        coloured.first_index = first_index;
-        coloured.first_vertex = first_vertex;
-        coloured.index_count = indices.count;
-        coloured.coloured = .{colour};
-        add_render_command(coloured);
+    indices: [24] u32;
+    for 0..3 {
+        for i: 0..5 
+            indices[it*6+i] = u32.[0, 1, 2, 1, 3, 2][i] + cast(u32) (it * 4);
     }
+    
+    tex_coords: [16] Vec2;
+    for 0..3 {
+        for i: 0..3 {
+            tex_coords[it*4+i] = Vec2.[.{0, 0}, .{0, 1}, .{1, 0}, .{1, 1}][i];
+        }
+    }
+    
+    positions: [16] Vec3;
+    
+    // top
+    positions[0] = .{position.x, position.y, 0};
+    positions[1] = .{position.x, position.y + thickness, 0};
+    positions[2] = .{position.x + size.x, position.y, 0};
+    positions[3] = .{position.x + size.x, position.y + thickness, 0};
     
     // left
-    {
-        positions: [4] Vec3;
-        tex_coords: [4] Vec2;
-        indices := u32.[0, 1, 2, 1, 3, 2];
-        
-        tex_coords[0] = .{0, 0};
-        tex_coords[1] = .{0, 1};
-        tex_coords[2] = .{1, 0};
-        tex_coords[3] = .{1, 1};
-        
-        positions[0] = .{position.x, position.y, 0};
-        positions[1] = .{position.x, position.y + size.y, 0};
-        positions[2] = .{position.x + thickness, position.y, 0};
-        positions[3] = .{position.x + thickness, position.y + size.y, 0};
-        
-        first_index, first_vertex := write_buffers(indices, positions, tex_coords);
-        
-        coloured: Draw_Command;
-        coloured.type = .Coloured;
-        coloured.first_index = first_index;
-        coloured.first_vertex = first_vertex;
-        coloured.index_count = indices.count;
-        coloured.coloured = .{colour};
-        add_render_command(coloured);
-    }
-    
-    // right
-    {
-        positions: [4] Vec3;
-        tex_coords: [4] Vec2;
-        indices := u32.[0, 1, 2, 1, 3, 2];
-        
-        tex_coords[0] = .{0, 0};
-        tex_coords[1] = .{0, 1};
-        tex_coords[2] = .{1, 0};
-        tex_coords[3] = .{1, 1};
-        
-        positions[0] = .{position.x + size.x - thickness, position.y, 0};
-        positions[1] = .{position.x + size.x - thickness, position.y + size.y, 0};
-        positions[2] = .{position.x + size.x, position.y, 0};
-        positions[3] = .{position.x + size.x, position.y + size.y, 0};
-        
-        first_index, first_vertex := write_buffers(indices, positions, tex_coords);
-        
-        coloured: Draw_Command;
-        coloured.type = .Coloured;
-        coloured.first_index = first_index;
-        coloured.first_vertex = first_vertex;
-        coloured.index_count = indices.count;
-        coloured.coloured = .{colour};
-        add_render_command(coloured);
-    }
+    positions[4] = .{position.x, position.y, 0};
+    positions[5] = .{position.x, position.y + size.y, 0};
+    positions[6] = .{position.x + thickness, position.y, 0};
+    positions[7] = .{position.x + thickness, position.y + size.y, 0};
     
     // bottom
-    {
-        positions: [4] Vec3;
-        tex_coords: [4] Vec2;
-        indices := u32.[0, 1, 2, 1, 3, 2];
-        
-        tex_coords[0] = .{0, 0};
-        tex_coords[1] = .{0, 1};
-        tex_coords[2] = .{1, 0};
-        tex_coords[3] = .{1, 1};
-        
-        positions[0] = .{position.x, position.y + size.y, 0};
-        positions[1] = .{position.x, position.y + size.y - thickness, 0};
-        positions[2] = .{position.x + size.x, position.y + size.y, 0};
-        positions[3] = .{position.x + size.x, position.y + size.y - thickness, 0};
-        
-        first_index, first_vertex := write_buffers(indices, positions, tex_coords);
-        
-        coloured: Draw_Command;
-        coloured.type = .Coloured;
-        coloured.first_index = first_index;
-        coloured.first_vertex = first_vertex;
-        coloured.index_count = indices.count;
-        coloured.coloured = .{colour};
-        add_render_command(coloured);
-    }
+    positions[8] = .{position.x + size.x - thickness, position.y, 0};
+    positions[9] = .{position.x + size.x - thickness, position.y + size.y, 0};
+    positions[10] = .{position.x + size.x, position.y, 0};
+    positions[11] = .{position.x + size.x, position.y + size.y, 0};
+    
+    // right
+    positions[12] = .{position.x, position.y + size.y, 0};
+    positions[13] = .{position.x, position.y + size.y - thickness, 0};
+    positions[14] = .{position.x + size.x, position.y + size.y, 0};
+    positions[15] = .{position.x + size.x, position.y + size.y - thickness, 0};
+    
+    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    
+    coloured: Draw_Command;
+    coloured.type = .Coloured;
+    coloured.first_index = first_index;
+    coloured.first_vertex = first_vertex;
+    coloured.index_count = indices.count;
+    coloured.coloured = .{colour};
+    add_render_command(coloured);
 }
 
 get_commands_of_type :: (commands: [] Draw_Command, type: Draw_Command_Type) -> [..] Draw_Command {
@@ -302,13 +246,11 @@ Draw_Command_Type :: enum {
 Basic_Command :: struct {
     colour: Vec4;
     texture: u32;
-    tex_coords: [4] Vec2;
 }
 
 Font_Command :: struct {
     colour: Vec4;
     texture: u32;
-    tex_coords: [4] Vec2;
     with_camera := false;
 }
 
