@@ -79,6 +79,14 @@ approach :: (current: Vec2, goal: Vec2, dt: float) -> Vec2 {
     return out;
 }
 
+length :: (v: Vec2) -> float {
+    return sqrt(v.x*v.x + v.y*v.y);
+}
+
+distance :: (a: Vec2, b: Vec2) -> float {
+    return length(a-b);
+}
+
 operator == :: (a: Vec2, b: Vec2) -> bool {
     return almost_equals(a, b);
 }

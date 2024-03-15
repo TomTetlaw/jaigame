@@ -6,6 +6,8 @@ Texture :: struct {
 }
 
 load_texture :: (path: string) -> *Texture {
+    if path.count <= 0 return null;
+    
     for * textures {
         if equal(it.path, path) return it;
     }
@@ -34,11 +36,14 @@ load_texture :: (path: string) -> *Texture {
     return texture_pointer;
 }
 
-create_texture :: (name: string, width: int, height: int, pixels: *u8) -> *Texture {
+create_texture :: (name: string, width: int, height: int, pixels: *u8, one_channel := false) -> *Texture {
+    format := ifx one_channel then GL_RED else GL_RGBA;
+    internal_format := ifx one_channel then GL_RED else GL_RGBA;
+    
     object: u32;
     glGenTextures(1, *object);
     glBindTexture(GL_TEXTURE_2D, object);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, xx width, xx height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, xx internal_format, xx width, xx height, 0, xx format, GL_UNSIGNED_BYTE, pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);

@@ -22,7 +22,7 @@ prepare_build_options :: (mode: Target_Mode, options: *Build_Options) {
     }
 }
 
-iprof: *Metaprogram_Plugin;
+tracy: *Metaprogram_Plugin;
 
 do_build :: (mode: Target_Mode, do_profile: bool, options: *Build_Options) {
     workspace := compiler_create_workspace("Final workspace");
@@ -35,17 +35,17 @@ do_build :: (mode: Target_Mode, do_profile: bool, options: *Build_Options) {
     set_build_options(options, workspace);
     
     if do_profile {
-        iprof_flags: Intercept_Flags;
-	    iprof = Iprof.get_plugin();
-	    iprof.workspace = workspace;
-	    defer Iprof.finish(iprof);
-	    Iprof.before_intercept(iprof, *iprof_flags);
+        flags: Intercept_Flags;
+	    tracy = Tracy.get_plugin();
+	    tracy.workspace = workspace;
+	    defer Tracy.finish(tracy);
+	    Tracy.before_intercept(tracy, *flags);
 	}
     
     compiler_begin_intercept(workspace);
     
     if do_profile {
-        Iprof.add_source(iprof);
+        Tracy.add_source(tracy);
         add_build_string("DO_PROFILING :: 1;\n", workspace);
     } else {
         add_build_string("DO_PROFILING :: 0;\n", workspace);
@@ -72,26 +72,6 @@ do_build :: (mode: Target_Mode, do_profile: bool, options: *Build_Options) {
         }
     }
     
-    {
-        files := file_list("build/textures/");
-
-        builder: String_Builder;
-        init_string_builder(*builder);
-        
-        append(*builder, "_all_textures: [..] *Texture;\n");
-        
-        append(*builder, "load_all_textures :: () {\n");
-        for files {
-            if ends_with(it, ".jpg") || ends_with(it, ".png") {
-                path, basename, extension, filename := path_decomp(it);
-                append(*builder, tprint("array_add(*_all_textures, load_texture(\"textures/%\"));\n", filename));
-            }
-        }
-        append(*builder, "}\n"); 
-     
-        add_build_string(builder_to_string(*builder), workspace);
-    }
-    
     print("Files in build: %\n", files_in_build);
     
     message_loop(workspace, do_profile);
@@ -109,7 +89,7 @@ message_loop :: (workspace: Workspace, do_profile: bool) {
         if !message break;
         
         if do_profile {
-            Iprof.message(iprof, message);
+            Tracy.message(tracy, message);
         }
         
         if message.kind == {
@@ -135,131 +115,13 @@ message_loop :: (workspace: Workspace, do_profile: bool) {
 
 Codegen :: struct {
     generated := false;
-    
-    entity_structs: [..] *Type_Info_Struct;
 }
 
 note_struct :: (codegen: *Codegen, struct_info: *Type_Info_Struct) {
-    if is_subclass_of(struct_info, "Entity") array_add_if_unique(*codegen.entity_structs, struct_info);
 }
 
 generate_code :: (codegen: *Codegen) -> string {
-    print("Generating code...\n");
-    
-    names: [..] string;
-    for codegen.entity_structs array_add(*names, it.name);
-    print("Found entity types: %\n", names);
-    
-    builder: String_Builder;
-    init_string_builder(*builder);
-    
-    append(*builder, "#import \"Bucket_Array\";\n");
-    append(*builder, "#import \"File\";\n");
-    
-    for codegen.entity_structs {
-        append(*builder, tprint("_%: Entity_Class = %;\n", it.name, it_index));
-    }
-    
-    append(*builder, "entity_type_names := string.[");
-    for codegen.entity_structs {
-        append(*builder, tprint("\"%\", ", it.name));
-    }
-    append(*builder, "];\n\n");
-    
-    append(*builder, "create_entity_by_type_name :: (name: string, id := -1) -> *Entity {\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("    if equal(name, \"%\") return create_entity(%, id);\n", it.name, it.name));
-    }
-    append(*builder, "    assert(false);\n");
-    append(*builder, "    return null;\n");
-    append(*builder, "}\n\n");
-    
-    append(*builder, "create_entity_from_save :: (class: Entity_Class, id: int) -> *Entity {\n");
-    append(*builder, "e: *Entity;\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("if class == _% e = create_entity(%, id);\n", it.name, it.name));
-    }
-    append(*builder, "if !e { assert(false); return null; }\n");
-    append(*builder, "return e;\n");
-    append(*builder, "}\n\n");
-    
-    append(*builder, "entity_class_for_type :: ($T: Type) -> Entity_Class {\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("    #if T == % return _%;\n", it.name, it.name));
-    }
-    append(*builder, "    assert(false);\n");
-    append(*builder, "    return -1;\n");
-    append(*builder, "}\n\n");
-    
-    append(*builder, "DERIVED_ENTITY_LISTS :: #string HERE\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("_%: Bucket_Array(%, ENTITY_BUCKET_SIZE);\n", it.name, it.name));
-    }
-    append(*builder, "HERE\n\n");
-    
-    append(*builder, "array_for_entity :: ($T: Type) -> *Bucket_Array(T, ENTITY_BUCKET_SIZE) {\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("    #if T == % return *entity_list._%;\n", it.name, it.name));
-    }
-    append(*builder, "    assert(false);\n");
-    append(*builder, "    return null;\n");
-    append(*builder, "}\n");
-    
-    append(*builder, "remove_entity :: (entity: *Entity) {\n");
-    append(*builder, "    array_unordered_remove_by_value(*entity_list.active_entities, entity);\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("    if entity.class == _% bucket_array_remove(*entity_list._%, entity.locator);\n", it.name, it.name));
-    }
-    append(*builder, "}\n");
-    
-    append(*builder, "remove_all_entities :: () {\n");
-    append(*builder, "entity_list.active_entities.count = 0;\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("for entity_list._% remove it;\n", it.name));
-    }
-    append(*builder, "}\n");
-    
-    append(*builder, "get_entity_from_locator :: (ref: Entity_Ref) -> *Entity {\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("    if ref.class == _% return bucket_array_get(*entity_list._%, ref.locator);\n", it.name, it.name));
-    }
-    append(*builder, "    assert(false);\n");
-    append(*builder, "    return null;\n");
-    append(*builder, "}\n\n");
-    
-    append(*builder, "serialize_entity :: (entity: *Entity) -> string {\n");
-    append(*builder, "builder: String_Builder;\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("if entity.class == _% {\n", it.name));
-        append(*builder, tprint("e := entity_cast(entity, %);\n", it.name));
-        append(*builder, tprint("append(*builder, tprint(\"[\\\"%\\\", %%, %%]\\n\", e.VERSION, entity.id));\n", it.name));
-        append(*builder, "serialize(*builder, \"\", e);\n");
-        append(*builder, "}\n");
-    }
-    append(*builder, "return builder_to_string(*builder);\n");
-    append(*builder, "}\n");
-    
-    append(*builder, "deserialize_entity :: (entity: *Entity, version: int, members: *Table(string, string)) {\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("if entity.class == _% {\n", it.name));
-        append(*builder, tprint("e := entity_cast(entity, %);\n", it.name));
-        append(*builder, "deserialize(members, version, \"\", e);\n");
-        append(*builder, "}\n");
-    }
-    append(*builder, "}\n");
-    
-    append(*builder, "do_entity_imgui :: (entity: *Entity) {\n");
-    append(*builder, "ImGui.PushID(tprint(\"%\", entity.id));\n");
-    for codegen.entity_structs {
-        append(*builder, tprint("if entity.class == _% {\n", it.name));
-        append(*builder, tprint("e := cast(*%) entity;\n", it.name));
-        append(*builder, "do_custom_imgui(tprint(\"% (%)\", e.id, entity_type_names[e.class]), e);\n");
-        append(*builder, "}\n");
-    }
-    append(*builder, "ImGui.PopID();\n");
-    append(*builder, "}\n");
-    
-    return builder_to_string(*builder);
+    return "";
 }
 
 find_note :: (notes: [] string, note: string) -> bool {
@@ -295,5 +157,4 @@ build :: () {
 #import "File_Utilities";
 #import "String";
 #import "Metaprogram_Plugins";
-//Iprof :: #import "Iprof";
-Iprof :: #import "jai-tracy";
+Tracy :: #import "jai-tracy";

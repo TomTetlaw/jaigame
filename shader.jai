@@ -36,7 +36,7 @@ set_shader_texture :: (shader: *Shader, name: string, value: u32, unit: u32) {
     loc := get_shader_location(shader, name);
     glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, value);
-    glUniform1ui(loc, unit);
+    glUniform1i(loc, xx unit);
 }
 
 make_shader_program :: (shader_text: string) -> Shader {

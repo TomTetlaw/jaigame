@@ -6,13 +6,6 @@ log :: (format: string, args: ..Any) {
     print("%\n", out);
 } @PrintLike
 
-copy_string_n :: (dest: *string, source: string, n: int) {
-    assert(dest.count > n);
-    for 0..n-1 {
-        (<<dest)[it] = source[it];
-    }
-}
-
 zero :: (Value: *$T) {
     memset(Value, 0, size_of(T));
 }
@@ -28,24 +21,6 @@ bucket_array_get :: (using array: *Bucket_Array, locator: Bucket_Locator) -> *ar
 advance :: (array: * [..] $T, count := 1) {
     array.data += count;
     array.count -= count;
-}
-
-tarray :: ($T: Type) -> [..] T {
-    array: [..] T;
-    array.allocator = temp;
-    return array;
-}
-
-tarray :: (array: [..] $T) -> [] T {
-    out: [] T;
-    
-    size := size_of(T) * array.count;
-    
-    out.count = array.count;
-    out.data = alloc(size);
-    memcpy(out.data, array.data, size);
-    
-    return out;
 }
 
 random_get_in_range :: (min: int, max: int) -> int {
@@ -68,35 +43,8 @@ fatal_error :: (format: string, args: ..Any) {
     exit(0);
 }
 
-parse_vec2 :: (s: string) -> Vec2 {
-    x, y: float;
-    scan2(s, "%,%", *x, *y);
-    return .{x, y};
-}
-
-parse_vec4 :: (s: string) -> Vec4 {
-    x, y, z, w: float;
-    scan2(s, "%,%,%,%", *x, *y, *z, *w);
-    return .{x, y, z, w};
-}
-
-parse_colour :: (s: string) -> Colour {
-    x, y, z, w: float;
-    scan2(s, "%,%,%,%", *x, *y, *z, *w);
-    return .{x, y, z, w};
-}
-
-find_note :: (notes: [] string, note: string) -> bool {
-    for notes if equal(it, note) return true;
-    return false;
-}
-
-not_easy_struct :: (info: *Type_Info) -> bool {
-    if info.type != .STRUCT return false;
-    s_type_info := cast(*Type_Info_Struct) info;
-    if s_type_info.name == "Vec2" return false;
-    if s_type_info.name == "Vec4" return false;
-    return true;
+key_to_string :: inline (code: SDL_Keycode) -> string {
+    return enum_names(SDL_Keycode)[code];
 }
 
 #import "Basic";
