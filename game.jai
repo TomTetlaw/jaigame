@@ -7,15 +7,9 @@ init_game :: () {
 }
 
 game_draw :: () {
-    debug_show_vars(real_time, game_time, delta_time, game_paused);
-    debug_string("Hello");
-    debug_show_vars(real_time, game_time, delta_time, game_paused);
-    debug_string("Hello");
-    debug_show_vars(real_time, game_time, delta_time, game_paused);
-    debug_string("Hello");
-    debug_show_vars(real_time, game_time, delta_time, game_paused);
-    debug_string("Hello");
-    debug_show_vars(real_time, game_time, delta_time, game_paused);
+    if draw_debug {
+        debug_show_vars(real_time, game_time, delta_time, game_paused);
+    }
 }
 
 game_update :: () {
@@ -36,7 +30,7 @@ game_update :: () {
         old_time = now;
     }
     
-    if key_pressed(SDLK_SPACE) game_paused = !game_paused;
+    if key_pressed(SDLK_F1) draw_debug = !draw_debug;
     
     keys_this_frame.count = 0;
 }
@@ -49,6 +43,7 @@ game_input :: (down: bool, code: SDL_Keycode) {
 
 old_time: Apollo_Time;
 
+draw_debug := false;
 debug_font: *Font;
 
 key_pressed :: (code: SDL_Keycode) -> bool {
