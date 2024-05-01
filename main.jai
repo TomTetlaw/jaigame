@@ -25,7 +25,7 @@ main :: () {
     ImGui_ImplSdl_Init(window);
     imgui_io = ImGui.GetIO();
     
-    my_font := load_font("fonts/consolas.ttf", 16);
+    init_game();
     
     exit := false;
     while true {
@@ -35,18 +35,19 @@ main :: () {
         ImGui_ImplSdl_NewFrame(window);
         ImGui.NewFrame();
         
-        draw_wireframe_quad(.{100, 100}, .{50, 50}, 3);
-        
-        draw_text(my_font, .{200, 200}, "Hello, world!");
+        game_update();
+        game_draw();
         
         renderer_do_commands();
-
+        
         ImGui.Render();
         ImGui_ImplSdl_RenderDrawLists(ImGui.GetDrawData());
         
         SDL_GL_SwapWindow(window);
         
-        #if DO_PROFILING __Tracy.FrameMark();
+#if DO_PROFILING __Tracy.FrameMark();
+        
+        reset_temporary_storage();
     }
 }
 
@@ -58,12 +59,13 @@ process_window_events :: () -> bool {
         ImGui_ImplSdl_ProcessEvent(*event);
         if !imgui_io.WantCaptureMouse {
             if event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEBUTTONDOWN ||
-               event.type == SDL_MOUSEMOTION {
+                event.type == SDL_MOUSEMOTION {
             }
         }
         
         if !imgui_io.WantCaptureKeyboard {
             if event.type == SDL_KEYUP || event.type == SDL_KEYDOWN {
+                game_input(event.type == SDL_KEYDOWN, event.key.keysym.sym);
             }
         }
     }

@@ -35,7 +35,7 @@ load_font :: (path: string, size: float) -> *Font {
     Stbtt.pack_begin(*pack_context, pixels, width, height, width, 1, null);
     Stbtt.pack_font_range(*pack_context, file.data, 0, size, 32, 96, char_data.data);
     
-    texture := create_texture(tprint("%_%", path, size), width, height, pixels, true);
+    texture := create_texture(tprint("%_%", path, size), width, height, pixels, .R);
     free(pixels);
     
     ascent, descent, line_gap: s32 = 0;

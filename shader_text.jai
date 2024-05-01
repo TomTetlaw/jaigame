@@ -29,7 +29,6 @@ out vec4 output_colour;
 
 void main() {
     vec4 final_colour = frag_colour * texture(base_texture, frag_tex_coord);
-    if (final_colour.a < .5) discard;
     output_colour = final_colour;
 }
 
@@ -39,7 +38,7 @@ HERE
 
 basic_shader: Shader;
 
-prepare_basic_shader :: (args: *Basic_Command) {
+prepare_basic_shader :: (args: *Draw_Command) {
     projection := orthographic_projection_matrix(0, render_size.x, render_size.y, 0, -1, 1);
     
     glUseProgram(basic_shader.program);
@@ -90,7 +89,7 @@ HERE
 
 coloured_shader: Shader;
 
-prepare_coloured_shader :: (args: *Coloured_Command) {
+prepare_coloured_shader :: (args: *Draw_Command) {
     projection := orthographic_projection_matrix(0, render_size.x, render_size.y, 0, -1, 1);
     
     glUseProgram(coloured_shader.program);
@@ -141,7 +140,7 @@ HERE
 
 font_shader: Shader;
 
-prepare_font_shader :: (args: *Font_Command) {
+prepare_font_shader :: (args: *Draw_Command) {
     projection := orthographic_projection_matrix(0, render_size.x, render_size.y, 0, -1, 1);
     
     glUseProgram(font_shader.program);

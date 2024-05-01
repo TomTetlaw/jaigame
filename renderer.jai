@@ -35,9 +35,11 @@ renderer_init :: (screen_size: Vec2) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     set_camera_position(v2(0,0));
+    
+    debug_font = load_font("fonts/consolas.ttf", 16.0);
 }
 
-draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}, depth := 0, tex_coords: [4] Vec2 = .[.{0,0}, .{0,1}, .{1,0}, .{1,1}]) {
+draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1 }, custom_size := Vec2.{-1, -1}, tex_coords: [4] Vec2 = .[.{0,0}, .{0,1}, .{1,0}, .{1,1}]) {
     size := custom_size;
     if custom_size.x == -1 || custom_size.y == -1 {
         size = .{ xx texture.width, xx texture.height };
@@ -51,15 +53,16 @@ draw_texture :: (texture: *Texture, position: Vec2, colour: Vec4 = .{ 1, 1, 1, 1
     positions[2] = .{position.x + size.x, position.y, 0};
     positions[3] = .{position.x + size.x, position.y + size.y, 0};
     
-    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    first_index, first_vertex := write_render_buffers(indices, positions, tex_coords);
     
     basic: Draw_Command;
     basic.type = .Basic;
     basic.first_index = first_index;
     basic.first_vertex = first_vertex;
     basic.index_count = indices.count;
-    basic.basic = .{colour, texture.object};
-    basic.depth = depth;
+    basic.colour = colour;
+    basic.texture = texture.object;
+    basic.alpha_blended = true;
     add_render_command(basic);
 }
 
@@ -73,7 +76,7 @@ draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{1, 1, 1, 1}, tex_coor
     positions[2] = .{position.x + size.x, position.y, 0};
     positions[3] = .{position.x + size.x, position.y + size.y, 0};
     
-    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    first_index, first_vertex := write_render_buffers(indices, positions, tex_coords);
     
     coloured: Draw_Command;
     coloured.type = .Basic;
@@ -81,11 +84,11 @@ draw_quad :: (position: Vec2, size: Vec2, colour: Vec4 = .{1, 1, 1, 1}, tex_coor
     coloured.first_vertex = first_vertex;
     coloured.index_count = indices.count;
     coloured.type = .Coloured;
-    coloured.coloured = .{colour};
+    coloured.colour = colour;
     add_render_command(coloured);
 }
 
-draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1}, depth := 0, with_camera := false) {
+draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1}, with_camera := false, $PROCESS_NEWLINES := false) -> float {
     position := origin;
     
     positions: [..] Vec3;
@@ -97,8 +100,21 @@ draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1},
     indices: [..] u32;
     indices.allocator = temp;
     
+    quad_indices :: u32.[0, 1, 2, 1, 3, 2];
+    
+    quad_index := 0;
+    
     for 0..text.count-1 {
-        c := text.data[it];
+        c := text[it];
+        
+#if PROCESS_NEWLINES {
+            if c == #char "\n" {
+                position.x = origin.x;
+                position.y += font.line_skip;
+                continue;
+            }
+        }
+        
         if c < 32 || c >= 128 continue;
         
         quad: Stbtt.AlignedQuad;
@@ -106,6 +122,9 @@ draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1},
         
         quad.y0 += font.size;
         quad.y1 += font.size;
+        
+        w := quad.x1 - quad.x0;
+        h := quad.y1 - quad.y0;
         
         array_add(*positions, .{quad.x0, quad.y0, 0}); 
         array_add(*positions, .{quad.x0, quad.y1, 0});
@@ -117,23 +136,53 @@ draw_text :: (font: *Font, origin: Vec2, text: string, colour := Vec4.{1,1,1,1},
         array_add(*tex_coords, .{quad.s1, quad.t0});
         array_add(*tex_coords, .{quad.s1, quad.t1});
         
-        quad_indices :: u32.[0, 1, 2, 1, 3, 2];
-        for i: 0..5 {
-            array_add(*indices, cast(u32) (it * 4) + quad_indices[i]);
-        }
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[0]);
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[1]);
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[2]);
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[3]);
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[4]);
+        array_add(*indices, cast(u32) (quad_index * 4) + quad_indices[5]);
+        quad_index += 1;
     }
     
-    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    first_index, first_vertex := write_render_buffers(indices, positions, tex_coords);
     
     font_command: Draw_Command;
     font_command.type = .Font;
     font_command.first_index = first_index;
     font_command.first_vertex = first_vertex;
     font_command.index_count = indices.count;
-    font_command.font = .{colour, font.texture.object, with_camera};
-    font_command.depth = depth;
+    font_command.colour = colour;
+    font_command.texture = font.texture.object;
+    font_command.with_camera = with_camera;
+    font_command.alpha_blended = true;
     
     add_render_command(font_command);
+    
+    return position.y - font.line_skip;
+}
+
+// code taken from Print_Vars.jai and modified
+debug_show_vars :: ($args: .. Code) #expand {
+    config: Print_Vars_Config;
+    config.after_value = "";
+    config.control_flags = .PRINT_NAME | .PRINT_VALUE;
+    
+    builder: String_Builder;
+    debug_string_helper(*builder, config, args);
+    message := builder_to_string(*builder);
+    
+    final_y := draw_text(debug_font, debug_string_position, message, PROCESS_NEWLINES = true);
+    debug_string_position = .{debug_string_position.x, final_y + debug_font.line_skip*2};
+}
+
+debug_string :: (format: string, args: ..Any) {
+    builder: String_Builder;
+    print_to_builder(*builder, format, ..args);
+    message := builder_to_string(*builder);
+    
+    draw_text(debug_font, debug_string_position, message);
+    debug_string_position += .{0, debug_font.line_skip*2};
 }
 
 draw_wireframe_quad :: (position: Vec2, size: Vec2, thickness: float, colour: Vec4 = .{ 1, 1, 1, 1 }) {
@@ -176,56 +225,41 @@ draw_wireframe_quad :: (position: Vec2, size: Vec2, thickness: float, colour: Ve
     positions[14] = .{position.x + size.x, position.y + size.y, 0};
     positions[15] = .{position.x + size.x, position.y + size.y - thickness, 0};
     
-    first_index, first_vertex := write_buffers(indices, positions, tex_coords);
+    first_index, first_vertex := write_render_buffers(indices, positions, tex_coords);
     
     coloured: Draw_Command;
     coloured.type = .Coloured;
     coloured.first_index = first_index;
     coloured.first_vertex = first_vertex;
     coloured.index_count = indices.count;
-    coloured.coloured = .{colour};
+    coloured.colour = colour;
     add_render_command(coloured);
-}
-
-get_commands_of_type :: (commands: [] Draw_Command, type: Draw_Command_Type) -> [..] Draw_Command {
-    out: [..] Draw_Command;
-    out.allocator = temp;
-    for commands if it.type == type array_add(*out, it);
-    return out;
 }
 
 renderer_do_commands :: () {
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT);
     
-    commands := array_view(render_commands, 0);
-    quick_sort(commands, (a, b) => a.depth - b.depth);
-    
-    basic_commands := get_commands_of_type(commands, .Basic);
-    coloured_commands := get_commands_of_type(commands, .Coloured);
-    font_commands := get_commands_of_type(commands, .Font);
-    
-    for basic_commands {
-        prepare_basic_shader(*it.basic);
-        glDrawElementsBaseVertex(GL_TRIANGLES, xx it.index_count, GL_UNSIGNED_INT, cast(*void) (it.first_index * size_of(u32)), xx it.first_vertex);
-    }
-    
-    for coloured_commands {
-        prepare_coloured_shader(*it.coloured);
-        glDrawElementsBaseVertex(GL_TRIANGLES, xx it.index_count, GL_UNSIGNED_INT, cast(*void) (it.first_index * size_of(u32)), xx it.first_vertex);
-    }
-    
-    for font_commands {
-        prepare_font_shader(*it.font);
+    for render_commands {
+        if it.type == {
+            case .Basic;
+            prepare_basic_shader(*it);
+            case .Coloured;
+            prepare_coloured_shader(*it);
+            case .Font;
+            prepare_font_shader(*it);
+        }
         
-        glEnable(GL_BLEND);
+        if it.alpha_blended glEnable(GL_BLEND);
         glDrawElementsBaseVertex(GL_TRIANGLES, xx it.index_count, GL_UNSIGNED_INT, cast(*void) (it.first_index * size_of(u32)), xx it.first_vertex);
-        glDisable(GL_BLEND);
+        if it.alpha_blended glDisable(GL_BLEND);
     }
     
     written_indices = 0;
     written_vertices = 0;
     render_commands.count = 0;
+    
+    debug_string_position = DEBUG_STRING_ORIGIN;
 }
 
 bind_textures :: (textures: [] u32) {
@@ -241,47 +275,29 @@ Draw_Command_Type :: enum {
     Basic;
     Coloured;
     Font;
-}
-
-Basic_Command :: struct {
-    colour: Vec4;
-    texture: u32;
-}
-
-Font_Command :: struct {
-    colour: Vec4;
-    texture: u32;
-    with_camera := false;
-}
-
-Coloured_Command :: struct {
-    colour: Vec4;
+    Tilemap;
 }
 
 Draw_Command :: struct {
     type: Draw_Command_Type;
-    depth := 0;
     index_count := 0;
     first_index := 0;
     first_vertex := 0;
-    
-    union {
-        basic: Basic_Command;
-        coloured: Coloured_Command;
-        font: Font_Command;
-    }
+    texture: u32;
+    colour := Vec4.{1, 1, 1, 1};
+    with_camera := false;
+    alpha_blended := false;
 }
 
-#scope_file
+add_render_command :: (command: Draw_Command) {
+    array_add(*render_commands, command);
+}
 
-written_indices := 0;
-written_vertices := 0;
-
-write_buffers :: (indices: [] u32, positions: [] Vec3, tex_coords: [] Vec2) -> int, int {
+write_render_buffers :: (indices: [] u32, positions: [] Vec3, tex_coords: [] Vec2) -> int, int {
     assert(tex_coords.count == positions.count);
     
-    if written_indices + indices.count >= MAX_INDICES fatal_error("Out of indices");
-    if written_vertices + positions.count >= MAX_VERTICES fatal_error("Out of vertices");
+    if written_indices + indices.count >= MAX_INDICES fatal_error("Out of indices, wanted %, used %, max is %", indices.count, written_indices, MAX_INDICES);
+    if written_vertices + positions.count >= MAX_VERTICES fatal_error("Out of vertices: wanted %, used %, max is %", positions.count, written_vertices, MAX_VERTICES);
     
     first_index := written_indices;
     first_vertex := written_vertices;
@@ -299,14 +315,15 @@ write_buffers :: (indices: [] u32, positions: [] Vec3, tex_coords: [] Vec2) -> i
     return first_index, first_vertex;
 }
 
+#scope_file
+
+written_indices := 0;
+written_vertices := 0;
+
 render_commands: [..] Draw_Command;
 
-add_render_command :: (command: Draw_Command) {
-    array_add(*render_commands, command);
-}
-
-MAX_VERTICES :: 1000;
-MAX_INDICES :: 3000;
+MAX_VERTICES :: 50000;
+MAX_INDICES :: 50000;
 
 position_buffer: u32;
 tex_coord_buffer: u32;
@@ -320,6 +337,51 @@ create_buffer :: (target: u32, size: int, name: string) -> u32 {
     glBufferData(target, xx size, null, GL_STATIC_DRAW);
     glObjectLabel(GL_BUFFER, object, xx name.count, name.data);
     return object;
+}
+
+DEBUG_STRING_LEFT :: 16.0;
+DEBUG_STRING_TOP :: 16.0;
+DEBUG_STRING_ORIGIN :: Vec2.{DEBUG_STRING_LEFT, DEBUG_STRING_TOP};
+debug_string_position := DEBUG_STRING_ORIGIN;
+debug_font: *Font;
+
+// code taken from Print_Vars.jai 
+debug_string_helper :: (builder: *String_Builder, config: Print_Vars_Config, $args: [$N] Code) #expand {
+    names:         [N] string;
+    value_strings: [N] string;
+    
+    // We go in two passes; in the first, we compute the names, because we want to know how
+    // wide those are for formatting purposes. In the second pass, we do the values.
+    
+    // Pass 1, names.
+#insert -> string {
+        my: String_Builder;
+        
+        for 0..args.count-1 {
+            print_to_builder(*my, "    names[%1] = #run get_code_name(args[%1]);\n", it);
+            print_to_builder(*my, "    value%1 := #insert args[%1];\n", it);
+            print_to_builder(*my, "    value_strings[%1] = tprint(\"\%\", value%1);\n", it);
+        }
+        
+        return builder_to_string(*my);
+    }
+    
+    name_width  := 0;
+    value_width := 0;
+    
+    for names          name_width  = Max(name_width,  it.count);
+    for value_strings  value_width = Max(value_width, it.count);
+    
+    // Pass 2, values.
+#insert -> string {
+        my: String_Builder;
+        
+        for 0..args.count-1 {
+            print_to_builder(*my, "    print_helper(builder, config, name_width, value_width, names[%1], value_strings[%1], type_of(value%1));\n", it);
+        }
+        
+        return builder_to_string(*my);
+    };
 }
 
 #import "Basic";

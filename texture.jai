@@ -36,14 +36,30 @@ load_texture :: (path: string) -> *Texture {
     return texture_pointer;
 }
 
-create_texture :: (name: string, width: int, height: int, pixels: *u8, one_channel := false) -> *Texture {
-    format := ifx one_channel then GL_RED else GL_RGBA;
-    internal_format := ifx one_channel then GL_RED else GL_RGBA;
+Texture_Format :: enum {
+    Rgba;
+    Rgb;
+    R;
+}
+
+create_texture :: (name: string, width: int, height: int, pixels: *u8, format: Texture_Format = .Rgba) -> *Texture {
+    pixel_format, internal_format: u32;
+    if format == {
+        case .Rgba;
+        pixel_format = GL_RGBA;
+        internal_format = GL_RGBA8;
+        case .Rgb;
+        pixel_format = GL_RGB;
+        internal_format = GL_RGB8;
+        case .R;
+        pixel_format = GL_RED;
+        internal_format = GL_R8;
+    }
     
     object: u32;
     glGenTextures(1, *object);
     glBindTexture(GL_TEXTURE_2D, object);
-    glTexImage2D(GL_TEXTURE_2D, 0, xx internal_format, xx width, xx height, 0, xx format, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, xx internal_format, xx width, xx height, 0, xx pixel_format, GL_UNSIGNED_BYTE, pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);

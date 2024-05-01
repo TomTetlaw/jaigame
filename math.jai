@@ -1,13 +1,21 @@
 
-truncate :: (value: float) -> int {
-    return cast(int) (value - frac(value));
+Vec2i :: struct {
+    x, y: int;
+}
+
+operator + :: (a: Vec2i, b: Vec2i) -> Vec2i {
+    return .{a.x+b.x, a.y+b.y};
+}
+
+operator == :: (a: Vec2i, b: Vec2i) -> bool {
+    return a.x==b.x && a.y==b.y;
 }
 
 Vec2 :: struct {
     x: float;
     y: float;
     
-    #place x;
+#place x;
     component: [2] float = ---; @no_imgui @no_serialize
 }
 
@@ -16,7 +24,7 @@ Vec3 :: struct {
     y: float;
     z: float;
     
-    #place x;
+#place x;
     component: [3] float = ---; @no_imgui @no_serialize
 }
 
@@ -26,7 +34,7 @@ Vec4 :: struct {
     z: float;
     w: float;
     
-    #place x;
+#place x;
     component: [4] float = ---; @no_imgui @no_serialize
 }
 
@@ -42,6 +50,10 @@ v3f :: (v: float) -> Vec3 { return .{ v, v, v }; }
 v4 :: (x: float, y: float, z: float, w: float) -> Vec4 { return .{ x, y, z, w }; }
 v4f :: (v: float) -> Vec4 { return .{ v, v, v, v }; }
 
+truncate :: (value: float) -> int {
+    return cast(int) (value - frac(value));
+}
+
 almost_equals :: (a: float, b: float, tolerance := 0.00001) -> bool {
     if abs(b-a) > tolerance return false;
     return true;
@@ -51,6 +63,12 @@ almost_equals :: (a: Vec2, b: Vec2, tolerance := 0.00001) -> bool {
     if abs(b.x-a.x) > tolerance return false;
     if abs(b.y-a.y) > tolerance return false;
     return true;
+}
+
+clamp01 :: (a: $T) -> T {
+    if a < 0 return 0;
+    if a > 1 return 1;
+    return a;
 }
 
 abs :: (v: Vec2) -> Vec2 {
